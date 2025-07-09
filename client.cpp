@@ -1,54 +1,46 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   server.cpp                                         :+:      :+:    :+:   */
+/*   client.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: jetan <jetan@student.42kl.edu.my>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/07/09 14:07:40 by jetan             #+#    #+#             */
-/*   Updated: 2025/07/09 15:02:17 by jetan            ###   ########.fr       */
+/*   Created: 2025/07/09 14:07:45 by jetan             #+#    #+#             */
+/*   Updated: 2025/07/09 15:00:34 by jetan            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include <sys/socket.h>
-#include <unistd.h>
 #include <netinet/in.h>
-#include <iostream>
+#include <cstring>
+#include <unistd.h>
 
 int main()
 {
-	//creating server socket
+	//creating client socket
 	//AF_INET: IPv4 protocol
 	//SOCK_STREAM: TCP type socket
 	//0: default protocol
-	int serverFd = socket(AF_INET, SOCK_STREAM, 0);
+	int clientFd = socket(AF_INET, SOCK_STREAM, 0);
 	
-	//defining server address
+	//defining client address
 	//sin_family: specifies the address family
-	//sin_port = specifies the port number and must be used with htons()
+	//sin_port: specifies the port number and must be used with htons()
 	//htons: convert unsigned int from machine byte to network byte order;
 	//sin_addr: holds the IP address returned by inet_addr() to be used in 
 	//the socket connection
-	//INADDY_ANY: 
 	sockaddr_in address;
 	address.sin_family = AF_INET;
 	address.sin_port = htons(8080);
 	address.sin_addr.s_addr = INADDR_ANY;
 	
-	//binding server socket
-	bind(serverFd, (sockaddr *)&address, sizeof(address));
+	//connecting to the server
+	connect(clientFd, (sockaddr *)&address, sizeof(address));
 	
-	//listening for connection
-	listen(serverFd, 5);
+	//sending data to the server
+	const char *message = "Hello, server!";
+	send(clientFd, message, std::strlen(message), 0);
 	
-	//accepting a client connection
-	int clientSocket= accept(serverFd, nullptr, nullptr);
-	
-	//receiving data from the client
-	char buffer[1024] = {0};
-	recv(clientSocket, buffer, sizeof(buffer), 0);
-	std::cout << "Message from client: " << buffer << std::endl;
-
-	//closing the socket
-	close (serverFd);
+	//closing socket
+	close(clientFd);
 }
