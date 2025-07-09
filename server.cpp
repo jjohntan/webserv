@@ -6,7 +6,7 @@
 /*   By: jetan <jetan@student.42kl.edu.my>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/09 14:07:40 by jetan             #+#    #+#             */
-/*   Updated: 2025/07/09 15:02:17 by jetan            ###   ########.fr       */
+/*   Updated: 2025/07/09 15:09:34 by jetan            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -42,7 +42,7 @@ int main()
 	listen(serverFd, 5);
 	
 	//accepting a client connection
-	int clientSocket= accept(serverFd, nullptr, nullptr);
+	int clientSocket = accept(serverFd, NULL, NULL);
 	
 	//receiving data from the client
 	char buffer[1024] = {0};
