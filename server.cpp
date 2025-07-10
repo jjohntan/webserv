@@ -6,7 +6,7 @@
 /*   By: jetan <jetan@student.42kl.edu.my>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/09 14:07:40 by jetan             #+#    #+#             */
-/*   Updated: 2025/07/09 15:09:34 by jetan            ###   ########.fr       */
+/*   Updated: 2025/07/10 21:32:02 by jetan            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -48,6 +48,17 @@ int main()
 	char buffer[1024] = {0};
 	recv(clientSocket, buffer, sizeof(buffer), 0);
 	std::cout << "Message from client: " << buffer << std::endl;
+	
+	std::string body = "<h1>Hello World!</h1>";
+	
+	std::string response = "HTTP/1.1 200 OK\r\n";
+	response += "Content-Type: text/html\r\n";
+	response += "Content-Length: " + std::to_string(body.size()) + "\r\n";
+	response += "Connection: close\r\n";
+	response += "\r\n";
+	response += body;
+	
+	send(clientSocket, response.c_str(), response.size(), 0);
 
 	//closing the socket
 	close (serverFd);
