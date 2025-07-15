@@ -1,4 +1,4 @@
-#include HTTPREQUEST_HPP
+#include "HTTPRequest.hpp"
 
 // HTTPRequest::HTTPRequest() {}
 
@@ -33,24 +33,31 @@ void	HTTPRequest::setRawString(std::string rawString)
 	this->_rawString = rawString;
 }
 
-/************************************ HEADER******************************* */
-void	HTTPRequest::extractHeader()
+/************************************ REQUEST LINE ******************************* */
+void	HTTPRequest::extractRequestLine()
 {
 	if (this->_rawString.empty())
 		throw (HTTPRequest::EmptyRawString());
 	std::string	current_line;
-	std::isstringstream stream(this->_rawString); // for getline()
+	std::istringstream stream(this->_rawString); // for getline()
+	
 	std::getline(stream, current_line);
+	this->_request_line_len = current_line.size(); // doesn't include '/n'
 	this->processRequestLine(&current_line);
 }
 
 void	HTTPRequest::processRequestLine(std::string &line)
 {
 	this->trimBackslashR(line);
+	line = this->_request_line;
+	std::istringstream	line_stream(line);
+	std::string	method;
+	std::string	path;
+	std::string	version;
 
-	std::map<std::string, std::string>::iterator it;
-	
-	for (it = _header.begin(); )
+	this->_method = method;
+	this->_path = path;
+	this->_version = version;
 }
 
 /*
@@ -62,6 +69,26 @@ void	HTTPRequest::trimBackSlashR(std::string &line)
 	if (!line.empty() && line[line.size() - 1] == '\r')
 		line.erase(line.size() - 1, 1);
 }
+
+void	HTTPRequest::separateHeaderBody()
+{
+	size_t	header_start = this->_request_line_len + 1;
+	size_t	header_end = this->_rawString.find("\r\n\r\n");
+	if (header_end != std::string::npos)
+	{
+		this->_header = _rawString.substr(header_start, header_end - header_start); // extract only header
+		this->_body = _rawString.substr(header_end + 4); // + 4 to skip "\r\n\r\n"
+	}
+}
+
+/*************************HEADER***************************** */
+
+void	HTTPRequest::extractHeader()
+{
+
+}
+
+void
 
 /******************EXCEPTION******************* */
 const char *HTTPRequest::EmptyRawString::what() const throw()

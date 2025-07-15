@@ -21,13 +21,28 @@ class	HTTPRequest
 {
 	private:
 		std::string	_rawString;
+		std::string	_rawHeader;
+		std::string	_rawBody;
+
 		std::map<std::string, std::string> _header;
 		std::vector<char> _body;
 
+		/* Request Line */
 		std::string	_request_line;
-		void	extractHeader();
+		size_t	_request_line_len;
+		std::string	_method;
+		std::string	_path;
+		std::string	_version;
+
+		void	extractRequestLine();
 		void	processRequestLine(std::string &line);
-		void	trimBackslashR(std::string &line)
+		void	trimBackslashR(std::string &line);
+
+		/* Header & Body */
+		void	separateHeaderBody();
+
+		/* Header */
+		void	extractHeader();
 
 	public:
 		// HTTPRequest();
@@ -43,7 +58,7 @@ class	HTTPRequest
 		{
 			public: 
 				const char *what() const throw ();
-		}
+		};
 
 };
 
