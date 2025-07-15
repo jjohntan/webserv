@@ -6,7 +6,7 @@
 /*   By: jetan <jetan@student.42kl.edu.my>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/09 14:07:45 by jetan             #+#    #+#             */
-/*   Updated: 2025/07/09 15:00:34 by jetan            ###   ########.fr       */
+/*   Updated: 2025/07/15 20:18:32 by jetan            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,7 +15,7 @@
 #include <cstring>
 #include <unistd.h>
 
-int main()
+int createClient(int port)
 {
 	//creating client socket
 	//AF_INET: IPv4 protocol
@@ -23,6 +23,13 @@ int main()
 	//0: default protocol
 	int clientFd = socket(AF_INET, SOCK_STREAM, 0);
 	
+	return (clientFd);
+}
+
+int main()
+{
+	int port = 8080;
+	int clientFd = createClient(port);
 	//defining client address
 	//sin_family: specifies the address family
 	//sin_port: specifies the port number and must be used with htons()
