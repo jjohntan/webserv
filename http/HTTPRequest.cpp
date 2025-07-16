@@ -85,7 +85,27 @@ void	HTTPRequest::separateHeaderBody()
 
 void	HTTPRequest::extractHeader()
 {
+	std::string	key;
+	std::string	value;
+	size_t	colon_index = 0;
+	std::istringstream	stream(this->_rawHeader);
+	std::string	line;
 
+	while (std::getline(stream, line))
+	{
+		this->trimBackslashR(&line);
+		colon_index = line.find(":");
+		if (colon_index == std::string::npos)
+			continue; // skip malformed line
+		key = line.substr(0, colon_index);
+		value = line.substr(colon_index + 1);
+
+		// Trim the leading space (if exists)
+		if (!value.empty() && value[0] == ' ')
+			value.erase(0, 1);
+
+		this->_header[key] = value;
+	}
 }
 
 void
