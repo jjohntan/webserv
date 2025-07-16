@@ -6,7 +6,7 @@
 /*   By: jetan <jetan@student.42kl.edu.my>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/07/09 14:07:40 by jetan             #+#    #+#             */
-/*   Updated: 2025/07/15 20:48:57 by jetan            ###   ########.fr       */
+/*   Updated: 2025/07/16 15:14:35 by jetan            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,15 +14,19 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <iostream>
+#include <fcntl.h>
 
 int createListenerSocket(int port)
 {
 	//creating server socket
 	int serverFd = socket(AF_INET, SOCK_STREAM, 0);
-	if (serverFd < 0)
+	if (serverFd == -1)
 	{
-		return (-1);
+		std::cout << "socket failed" << std::endl;
+		exit (EXIT_FAILURE);
 	}
+	//Make socket non-blocking
+	fcntl(serverFd, F_SETFL, O_NONBLOCK);
 	//defining server address
 	struct sockaddr_in address;
 	address.sin_family = AF_INET;
@@ -30,14 +34,18 @@ int createListenerSocket(int port)
 	address.sin_addr.s_addr = INADDR_ANY;
 	
 	//binding server socket
-	if (bind(serverFd, (sockaddr *)&address, sizeof(address)) < 0)
+	if (bind(serverFd, (sockaddr *)&address, sizeof(address)) == -1)
 	{
 		std::cout << "bind failed" << std::endl;
 		exit (EXIT_FAILURE);
 	}
 	
 	//listening for connection
-	listen(serverFd, 5);
+	if (listen(serverFd, 5) == -1)
+	{
+		std::cout << "listen failed" << std::endl;
+		exit(EXIT_FAILURE);
+	}
 	return (serverFd);
 }
 
@@ -64,7 +72,7 @@ int main()
 		response += "\r\n";
 		response += body;
 		
-		sleep(5);
+		sleep(2);
 		send(clientFd, response.c_str(), response.size(), 0);
 		std::cout << "------------------Hello-------------" << std::endl;
 		close (clientFd);
