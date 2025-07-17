@@ -1,20 +1,9 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   server.cpp                                         :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: jetan <jetan@student.42kl.edu.my>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/07/09 14:07:40 by jetan             #+#    #+#             */
-/*   Updated: 2025/07/16 15:14:35 by jetan            ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
-
 #include <sys/socket.h>
 #include <unistd.h>
 #include <netinet/in.h>
 #include <iostream>
 #include <fcntl.h>
+#include <poll.h>
 
 int createListenerSocket(int port)
 {
@@ -52,8 +41,39 @@ int createListenerSocket(int port)
 int main()
 {
 	int serverFd = createListenerSocket(8080);
+	
+	//init
+	struct pollfd pfds[1];
+	
+	pfds[0].fd = 0;
+	pfds[0].events = POLLIN;
+	// Wait indefinitely (timeout = -1)
+	// Check which sockets are ready
+	// Existing client sent data
 	while (true)
 	{
+		int status = poll(pfds, 1, 2500);
+		if (status == -1)
+		{
+			std::cout << "timeout" << std::endl;
+		}
+		for (int i = 0; i < 1; i++)
+		{
+			if ((pfds[i].revents & POLLIN) != 1)
+			{
+				std::cout << "socket not ready to read" << std::endl;
+				continue;
+			}
+			std::cout << "ready for I/) operation" << std::endl;
+			if (pfds[i].fd == serverFd)
+			{
+				std::cout << "accept new connection" << std::endl;
+			}
+			else
+			{
+				std::cout << "read data from socket" << std::endl;
+			}
+		}
 		std::cout << "------------------waiting for new connection-------------" << std::endl;
 		//accepting a client connection
 		int clientFd = accept(serverFd, NULL, NULL);
@@ -72,7 +92,7 @@ int main()
 		response += "\r\n";
 		response += body;
 		
-		sleep(2);
+		// sleep(2);
 		send(clientFd, response.c_str(), response.size(), 0);
 		std::cout << "------------------Hello-------------" << std::endl;
 		close (clientFd);
