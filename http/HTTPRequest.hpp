@@ -24,8 +24,8 @@ class	HTTPRequest
 		std::string	_rawHeader;
 		std::string	_rawBody;
 
-		std::map<std::string, std::string> _header;
-		std::vector<char> _body;
+		std::map<std::string, std::string> _header; // winnie
+		std::vector<char> _body; // winnie
 
 		/* Request Line */
 		std::string	_request_line;
@@ -46,7 +46,7 @@ class	HTTPRequest
 
 	public:
 		// HTTPRequest();
-		HTTPRequest(std::string rawString);
+		HTTPRequest(std::string rawString); // John
 		~HTTPRequest();
 		HTTPRequest(const HTTPRequest &other);
 		const HTTPRequest	&operator=(const HTTPRequest &other);

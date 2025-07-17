@@ -4,9 +4,7 @@
 
 HTTPRequest::HTTPRequest(std::string rawString):
 	_rawString(rawString)
-{
-
-}
+{}
 
 HTTPRequest::HTTPRequest(const HTTPRequest &other):
 	_rawString(other._rawString), _header(other._header), _body(other._body)
@@ -108,6 +106,7 @@ void	HTTPRequest::extractHeader()
 	}
 }
 
+/*********************BODY******************************* */
 void
 
 /******************EXCEPTION******************* */
