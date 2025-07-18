@@ -40,16 +40,15 @@ int createListenerSocket(int port)
 
 int main()
 {
+	//create socket and non-blocking
 	int serverFd = createListenerSocket(8080);
 	
-	//init
+	//init/set up pollfd
 	struct pollfd pfds[1];
 	
-	pfds[0].fd = 0;
+	pfds[0].fd = serverFd;//monitor server socket
 	pfds[0].events = POLLIN;
-	// Wait indefinitely (timeout = -1)
-	// Check which sockets are ready
-	// Existing client sent data
+	//main loop
 	while (true)
 	{
 		int status = poll(pfds, 1, 2500);
@@ -57,6 +56,7 @@ int main()
 		{
 			std::cout << "timeout" << std::endl;
 		}
+		//loop throught array of socket
 		for (int i = 0; i < 1; i++)
 		{
 			if ((pfds[i].revents & POLLIN) != 1)
@@ -64,10 +64,30 @@ int main()
 				std::cout << "socket not ready to read" << std::endl;
 				continue;
 			}
-			std::cout << "ready for I/) operation" << std::endl;
-			if (pfds[i].fd == serverFd)
+			std::cout << pfds[i].fd << " ready for I/O operation" << std::endl;
+			if (pfds[i].fd == serverFd)//socket is our listening server socket
 			{
 				std::cout << "accept new connection" << std::endl;
+				//accepting a client connection
+				int clientFd = accept(serverFd, NULL, NULL);
+				
+				//receiving data from the client
+				char buffer[1024] = {0};
+				recv(clientFd, buffer, sizeof(buffer), 0);
+				std::cout << "Message from client: " << buffer << std::endl;
+				
+				std::string body = "<h1>Hello World, 8080!</h1>";
+				
+				std::string response = "HTTP/1.1 200 OK\r\n";
+				response += "Content-Type: text/html\r\n";
+				response += "Content-Length: " + std::to_string(body.size()) + "\r\n";
+				response += "Connection: close\r\n";
+				response += "\r\n";
+				response += body;
+				
+				send(clientFd, response.c_str(), response.size(), 0);
+				std::cout << "------------------Hello-------------" << std::endl;
+				close (clientFd);
 			}
 			else
 			{
@@ -75,27 +95,6 @@ int main()
 			}
 		}
 		std::cout << "------------------waiting for new connection-------------" << std::endl;
-		//accepting a client connection
-		int clientFd = accept(serverFd, NULL, NULL);
-		
-		//receiving data from the client
-		char buffer[1024] = {0};
-		recv(clientFd, buffer, sizeof(buffer), 0);
-		std::cout << "Message from client: " << buffer << std::endl;
-		
-		std::string body = "<h1>Hello World, 8080!</h1>";
-		
-		std::string response = "HTTP/1.1 200 OK\r\n";
-		response += "Content-Type: text/html\r\n";
-		response += "Content-Length: " + std::to_string(body.size()) + "\r\n";
-		response += "Connection: close\r\n";
-		response += "\r\n";
-		response += body;
-		
-		// sleep(2);
-		send(clientFd, response.c_str(), response.size(), 0);
-		std::cout << "------------------Hello-------------" << std::endl;
-		close (clientFd);
 	}
 	//closing the socket
 	close (serverFd);
