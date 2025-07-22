@@ -52,9 +52,15 @@ int main()
 	while (true)
 	{
 		int status = poll(pfds, 1, 2500);
+		
 		if (status == -1)
 		{
-			std::cout << "timeout" << std::endl;
+			std::cout << "error" << std::endl;
+		}
+		else if (status == 0)
+		{
+			std::cout << "time out" << std::endl;
+			continue;
 		}
 		//loop throught array of socket
 		for (int i = 0; i < 1; i++)
@@ -70,10 +76,17 @@ int main()
 				std::cout << "accept new connection" << std::endl;
 				//accepting a client connection
 				int clientFd = accept(serverFd, NULL, NULL);
-				
-				//receiving data from the client
+				if (clientFd == -1)
+				{
+					std::cout << "accept error" << std::endl;
+					return(1);
+				}
+				// Add a new file descriptor to the pollfd array
+			}
+			else
+			{
 				char buffer[1024] = {0};
-				recv(clientFd, buffer, sizeof(buffer), 0);
+				recv(pfds[i].fd, buffer, sizeof(buffer), 0);
 				std::cout << "Message from client: " << buffer << std::endl;
 				
 				std::string body = "<h1>Hello World, 8080!</h1>";
@@ -85,13 +98,10 @@ int main()
 				response += "\r\n";
 				response += body;
 				
-				send(clientFd, response.c_str(), response.size(), 0);
-				std::cout << "------------------Hello-------------" << std::endl;
-				close (clientFd);
-			}
-			else
-			{
+				send(pfds[i].fd, response.c_str(), response.size(), 0);
+				close (pfds[i].fd);
 				std::cout << "read data from socket" << std::endl;
+				// Remove an fd from the poll_fds array
 			}
 		}
 		std::cout << "------------------waiting for new connection-------------" << std::endl;
