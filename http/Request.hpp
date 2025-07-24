@@ -13,6 +13,6 @@
 # include <map>
 # include "HTTPRequest.hpp"
 
-HTTPRequest	storeSocketMap(size_t	socketID, std::string &text);
+void	storeSocketMap(int socketFD, std::string &text);
 
 #endif
