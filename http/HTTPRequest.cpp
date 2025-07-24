@@ -1,8 +1,14 @@
 #include "HTTPRequest.hpp"
 
 HTTPRequest::HTTPRequest():
-	_headerComplete(false), _bodyComplete(false), _isChunked(false), _chunkedComplete(false),
-	_bodyPos(0), _content_length(0), _chunkSize(0), _request_line_len(0)
+	_headerComplete(false),
+	_bodyComplete(false),
+	_isChunked(false),
+	_chunkedComplete(false),
+	_bodyPos(0),
+	_chunkSize(0),
+	_content_length(0),
+	_request_line_len(0)
 {}
 
 HTTPRequest::HTTPRequest(const HTTPRequest &other):
@@ -40,6 +46,8 @@ const HTTPRequest &HTTPRequest::operator=(const HTTPRequest &other)
 	}
 	return (*this);
 }
+
+HTTPRequest::~HTTPRequest() {}
 
 /************************GETTER & SETTER************************************ */
 /* Getters */
@@ -152,7 +160,7 @@ void	HTTPRequest::feed(std::string &data)
 		{
 			this->_headerComplete = true;
 			this->extractRequestLine();
-			this->_rawHeader = this->_rawString.substr(0, header_end);
+			this->_rawHeader = this->_rawString.substr(_request_line_len, header_end - _request_line_len);
 			this->extractHeader();
 			this->analyzeHeader();
 		}
@@ -199,7 +207,7 @@ void	HTTPRequest::processRequestLine(std::string &line)
 	line.size() == line.length() -> return number of characters in string
 	line.erase(pos, len) --- pos == position; len == how many words
 */
-void	HTTPRequest::trimBackSlashR(std::string &line)
+void	HTTPRequest::trimBackslashR(std::string &line)
 {
 	if (!line.empty() && line[line.size() - 1] == '\r')
 		line.erase(line.size() - 1, 1);
@@ -233,12 +241,15 @@ void	HTTPRequest::extractHeader()
 		throw (HTTPRequest::EmptyRawHeader());
 	while (std::getline(stream, line))
 	{
+		this->trimBackslashR(line);
 		if (line.empty())
 			continue;
-		this->trimBackslashR(line);
 		colon_index = line.find(":");
 		if (colon_index == std::string::npos)
+		{
 			std::cerr << YELLOW << "Malformed header line: " << line << RESET << std::endl;
+			continue;
+		}
 		key = line.substr(0, colon_index);
 		value = line.substr(colon_index + 1);
 

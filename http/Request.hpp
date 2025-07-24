@@ -14,5 +14,6 @@
 # include "HTTPRequest.hpp"
 
 void	storeSocketMap(int socketFD, std::string &text);
+void	printRequest(const HTTPRequest &req);
 
 #endif
