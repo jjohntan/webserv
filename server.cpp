@@ -9,7 +9,7 @@
 
 void deletePfds(struct pollfd **pfds, int i, int *fd_count)
 {
-	pfds[i] = pfds[*fd_count - 1];
+	(*pfds)[i] = (*pfds)[*fd_count - 1];
 	(*fd_count)--;
 }
 
@@ -62,12 +62,14 @@ void readData(int sockfd, int *fd_count, struct pollfd **pfds, int i)
 			perror("recv");
 		}
 		close(sender_fd);
+		// Remove an fd from the poll_fds array
 		deletePfds(pfds, i, fd_count);
 	}
 	else
 	{
 		for (int j = 0; j < *fd_count; j++)
 		{
+			dest_fd = (*pfds)[j].fd;
 			if (dest_fd != sockfd && dest_fd != sender_fd)
 			{
 				if (send(dest_fd, buf, bytes, 0) == -1)
@@ -138,19 +140,14 @@ int main()
 	//main loop
 	while (true)
 	{
-		int status = poll(pfds, 1, 2000);
+		int status = poll(pfds, fd_count, 2000);
 		if (status == -1)
 		{
 			perror("listen failed");
 			std::cout << "error" << std::endl;
 		}
-		else if (status == 0)
-		{
-			perror("time out");
-			continue;
-		}
 		//loop throught array of socket
-		for (int i = 0; i < 1; i++)
+		for (int i = 0; i < fd_count; i++)
 		{
 			if ((pfds[i].revents & POLLIN))
 			{
@@ -166,23 +163,6 @@ int main()
 			}
 			else
 			{
-				// char buffer[1024] = {0};
-				// recv(pfds[i].fd, buffer, sizeof(buffer), 0);
-				// std::cout << "Message from client: " << buffer << std::endl;
-				
-				// std::string body = "<h1>Hello World, 8080!</h1>";
-				
-				// std::string response = "HTTP/1.1 200 OK\r\n";
-				// response += "Content-Type: text/html\r\n";
-				// response += "Content-Length: " + std::to_string(body.size()) + "\r\n";
-				// response += "Connection: close\r\n";
-				// response += "\r\n";
-				// response += body;
-				
-				// send(pfds[i].fd, response.c_str(), response.size(), 0);
-				// close (pfds[i].fd);
-				// std::cout << "read data from socket" << std::endl;
-				// Remove an fd from the poll_fds array
 				readData(serverFd, &fd_count, &pfds, i);
 			}
 		}
