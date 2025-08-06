@@ -4,18 +4,99 @@
 #include <iostream>
 #include <fcntl.h>
 #include <poll.h>
+#include <vector>
+#include <stdlib.h>
+
+void deletePfds(struct pollfd **pfds, int i, int *fd_count)
+{
+	pfds[i] = pfds[*fd_count - 1];
+	(*fd_count)--;
+}
+
+void addPfds(struct pollfd **pfds, int newfd, int *fd_count, int *fd_size)
+{
+	if (*fd_count == *fd_size)
+	{
+		*fd_size *= 2;
+		*pfds = (struct pollfd*)realloc(*pfds, sizeof(**pfds) * (*fd_size));
+	}
+	
+	(*pfds)[*fd_count].fd = newfd;
+	(*pfds)[*fd_count].events = POLLIN;//check ready to read
+	(*pfds)[*fd_count].revents = 0;
+	
+	(*fd_count)++;
+}
+
+void newConnection(int sockfd, struct pollfd **pfds, int *fd_count, int *fd_size)
+{
+	struct sockaddr_in client_addr;
+	socklen_t addrlen = sizeof(client_addr);
+	
+	int clientFd = accept(sockfd, (struct sockaddr*)&client_addr, &addrlen);
+	if (clientFd == -1)
+	{
+		perror("accept error");
+		return;
+	}
+	// Add a new file descriptor to the pollfd array
+	addPfds(pfds, clientFd, fd_count, fd_size);
+}
+
+void readData(int sockfd, int *fd_count, struct pollfd **pfds, int i)
+{
+	char buf[256];
+	int dest_fd;
+	
+	int sender_fd = (*pfds)[i].fd;
+	int bytes = recv(sender_fd, buf, sizeof(buf), 0);
+	
+	if (bytes <= 0)
+	{
+		if (bytes == 0)
+		{
+			printf("client disconnected: %d", sender_fd);
+		}
+		else
+		{
+			perror("recv");
+		}
+		close(sender_fd);
+		deletePfds(pfds, i, fd_count);
+	}
+	else
+	{
+		for (int j = 0; j < *fd_count; j++)
+		{
+			if (dest_fd != sockfd && dest_fd != sender_fd)
+			{
+				if (send(dest_fd, buf, bytes, 0) == -1)
+				{
+					perror("send");
+				}
+			}
+		}
+	}
+}
 
 int createListenerSocket(int port)
-{
+{ 
 	//creating server socket
-	int serverFd = socket(AF_INET, SOCK_STREAM, 0);
-	if (serverFd == -1)
+	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sockfd == -1)
 	{
-		std::cout << "socket failed" << std::endl;
+		perror("socket failed");
 		exit (EXIT_FAILURE);
 	}
+	
+	const int enable = 1;
+	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) == -1)
+		perror("setsockopt failed");
 	//Make socket non-blocking
-	fcntl(serverFd, F_SETFL, O_NONBLOCK);
+	if (fcntl(sockfd, F_SETFL, O_NONBLOCK) == -1)
+	{
+		perror("fcntl");
+	}
 	//defining server address
 	struct sockaddr_in address;
 	address.sin_family = AF_INET;
@@ -23,49 +104,55 @@ int createListenerSocket(int port)
 	address.sin_addr.s_addr = INADDR_ANY;
 	
 	//binding server socket
-	if (bind(serverFd, (sockaddr *)&address, sizeof(address)) == -1)
+	if (bind(sockfd, (sockaddr *)&address, sizeof(address)) == -1)
 	{
-		std::cout << "bind failed" << std::endl;
+		perror("bind failed");
 		exit (EXIT_FAILURE);
 	}
 	
 	//listening for connection
-	if (listen(serverFd, 5) == -1)
+	if (listen(sockfd, 5) == -1)
 	{
-		std::cout << "listen failed" << std::endl;
+		perror("listen failed");
 		exit(EXIT_FAILURE);
 	}
-	return (serverFd);
+	return (sockfd);
 }
 
 int main()
 {
 	//create socket and non-blocking
 	int serverFd = createListenerSocket(8080);
+	if ( serverFd == -1)
+	{
+		perror("error create listener socker");
+	}
 	
 	//init/set up pollfd
-	struct pollfd pfds[1];
+	int fd_size = 5;
+	int fd_count = 0;
+	struct pollfd *pfds = (struct pollfd*)malloc(sizeof(*pfds) * fd_size);
 	
 	pfds[0].fd = serverFd;//monitor server socket
-	pfds[0].events = POLLIN;
+	pfds[0].events = POLLIN;// check ready to read
 	//main loop
 	while (true)
 	{
-		int status = poll(pfds, 1, 2500);
-		
+		int status = poll(pfds, 1, 2000);
 		if (status == -1)
 		{
+			perror("listen failed");
 			std::cout << "error" << std::endl;
 		}
 		else if (status == 0)
 		{
-			std::cout << "time out" << std::endl;
+			perror("time out");
 			continue;
 		}
 		//loop throught array of socket
 		for (int i = 0; i < 1; i++)
 		{
-			if ((pfds[i].revents & POLLIN) != 1)
+			if ((pfds[i].revents & POLLIN))
 			{
 				std::cout << "socket not ready to read" << std::endl;
 				continue;
@@ -75,33 +162,28 @@ int main()
 			{
 				std::cout << "accept new connection" << std::endl;
 				//accepting a client connection
-				int clientFd = accept(serverFd, NULL, NULL);
-				if (clientFd == -1)
-				{
-					std::cout << "accept error" << std::endl;
-					return(1);
-				}
-				// Add a new file descriptor to the pollfd array
+				newConnection(serverFd, &pfds, &fd_count, &fd_size);
 			}
 			else
 			{
-				char buffer[1024] = {0};
-				recv(pfds[i].fd, buffer, sizeof(buffer), 0);
-				std::cout << "Message from client: " << buffer << std::endl;
+				// char buffer[1024] = {0};
+				// recv(pfds[i].fd, buffer, sizeof(buffer), 0);
+				// std::cout << "Message from client: " << buffer << std::endl;
 				
-				std::string body = "<h1>Hello World, 8080!</h1>";
+				// std::string body = "<h1>Hello World, 8080!</h1>";
 				
-				std::string response = "HTTP/1.1 200 OK\r\n";
-				response += "Content-Type: text/html\r\n";
-				response += "Content-Length: " + std::to_string(body.size()) + "\r\n";
-				response += "Connection: close\r\n";
-				response += "\r\n";
-				response += body;
+				// std::string response = "HTTP/1.1 200 OK\r\n";
+				// response += "Content-Type: text/html\r\n";
+				// response += "Content-Length: " + std::to_string(body.size()) + "\r\n";
+				// response += "Connection: close\r\n";
+				// response += "\r\n";
+				// response += body;
 				
-				send(pfds[i].fd, response.c_str(), response.size(), 0);
-				close (pfds[i].fd);
-				std::cout << "read data from socket" << std::endl;
+				// send(pfds[i].fd, response.c_str(), response.size(), 0);
+				// close (pfds[i].fd);
+				// std::cout << "read data from socket" << std::endl;
 				// Remove an fd from the poll_fds array
+				readData(serverFd, &fd_count, &pfds, i);
 			}
 		}
 		std::cout << "------------------waiting for new connection-------------" << std::endl;
