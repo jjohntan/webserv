@@ -132,8 +132,13 @@ int main()
 	
 	//init/set up pollfd
 	int fd_size = 5;
-	int fd_count = 0;
+	int fd_count = 1;
 	struct pollfd *pfds = (struct pollfd*)malloc(sizeof(*pfds) * fd_size);
+	if (!pfds)
+	{
+		perror("malloc failed");
+		exit(EXIT_FAILURE);
+	}
 	
 	pfds[0].fd = serverFd;//monitor server socket
 	pfds[0].events = POLLIN;// check ready to read
@@ -144,12 +149,12 @@ int main()
 		if (status == -1)
 		{
 			perror("listen failed");
-			std::cout << "error" << std::endl;
+			break;
 		}
 		//loop throught array of socket
 		for (int i = 0; i < fd_count; i++)
 		{
-			if ((pfds[i].revents & POLLIN))
+			if (!(pfds[i].revents & POLLIN))
 			{
 				std::cout << "socket not ready to read" << std::endl;
 				continue;
@@ -168,6 +173,7 @@ int main()
 		}
 		std::cout << "------------------waiting for new connection-------------" << std::endl;
 	}
+	free(pfds);
 	//closing the socket
 	close (serverFd);
 }
