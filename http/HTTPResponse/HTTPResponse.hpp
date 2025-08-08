@@ -3,6 +3,10 @@
 
 #include <string>
 #include <iostream>
+#include <sys/socket.h>	// for send()
+#include <unistd.h>		 // for close()
+#include <sstream> // For std::istringstream
+#include <cstdio> // For perror()
 
 # define RED "\033[31m"
 # define GREEN "\033[32m"
@@ -16,8 +20,14 @@
 class	HTTPResponse
 {
 	private:
-		std::string	_statusLine;
-		std::string	_content;
+		std::string	_statusLine; // contain Status: 404 Not Found\r\n
+		std::string	_modifyStatus; // contain 404 Not Found\r\n
+		int			_statusCode;
+		std::string	_statusMessage;
+		std::string	_formatedStatus; // HTTP/1.1 404 Not Found\r\n
+		std::string	_completeRawResponse;
+
+		std::string	_content; // body & header
 		int	_socketFD;
 
 		HTTPResponse();
@@ -27,15 +37,35 @@ class	HTTPResponse
 		HTTPResponse(const HTTPResponse &other);
 		const HTTPResponse	&operator=(const HTTPResponse &other);
 
+		void	processHTTPResponse();
+		void	sendResponse() const;
+		
+		/* Status Line */
+		void	convertStatusLine();
+		void	extractStatusCodeAndMessage();
+		void	reformatStatusLine();
+
+		/* Response */
+		void	addStatusLineToContent();
+
+		/* Utility */
+		void	trimBackslashR(std::string &line);
+		void	trimLeadingSpaces(std::string &line);
+
 		/* Getters */
 		const std::string	&getStatusLine() const;
 		const std::string	&getContent() const;
-		const int			&getSocketFD() const;
+		int					getSocketFD() const;
+		const std::string	&getRawResponse() const;
+		const std::string	&getStatusMessage() const;
+		int					getStatusCode() const;
 
 		/* Setters */
-		void	setStatusLine(std::string &statusLine);
-		void	setContent(std::string &content);
-		void	setSocketFD(int	socketFD);
+		void	setStatusLine(const std::string &statusLine);
+		void	setContent(const std::string &content);
+		void	setSocketFD(const int	socketFD);
+		void	setStatusCode(const int statusCode);
+		void	setStatusMessage(const std::string statusMessage);
 
 };
 
