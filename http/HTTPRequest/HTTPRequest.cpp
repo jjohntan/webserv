@@ -11,8 +11,20 @@ HTTPRequest::HTTPRequest():
 	_request_line_len(0)
 {}
 
+HTTPRequest::HTTPRequest(int socketFD):
+	_socketFD(socketFD),
+	_headerComplete(false),
+	_bodyComplete(false),
+	_isChunked(false),
+	_chunkedComplete(false),
+	_bodyPos(0),
+	_chunkSize(0),
+	_content_length(0),
+	_request_line_len(0)
+{}
+
 HTTPRequest::HTTPRequest(const HTTPRequest &other):
-	_rawString(other._rawString), _rawHeader(other._rawHeader),
+	_socketFD(other._socketFD), _rawString(other._rawString), _rawHeader(other._rawHeader),
 	_rawBody(other._rawBody), _headerComplete(other._headerComplete),
 	_bodyComplete(other._bodyComplete), _header(other._header),
 	_body(other._body), _isChunked(other._isChunked),
@@ -26,6 +38,7 @@ const HTTPRequest &HTTPRequest::operator=(const HTTPRequest &other)
 {
 	if (this != &other)
 	{
+		this->_socketFD = other._socketFD;
 		this->_rawString = other._rawString;
 		this->_rawHeader = other._rawHeader;
 		this->_rawBody = other._rawBody;
