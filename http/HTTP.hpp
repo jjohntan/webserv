@@ -17,5 +17,7 @@
 # include <map>
 
 void	printRequest(const HTTPRequest &req);
+void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::vector<struct pollfd>& fds, size_t &i);
+bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::string	data)
 
 #endif
