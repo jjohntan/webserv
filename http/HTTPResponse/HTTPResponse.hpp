@@ -32,7 +32,9 @@ class	HTTPResponse
 
 		HTTPResponse();
 	public:
-		HTTPResponse(std::string statusLine, std::string content, int	socketFD);
+		HTTPResponse(std::string statusLine, std::string content, int socketFD);
+		HTTPResponse(std::string status, int errorCode);
+		HTTPResponse(std::string status, int errorCode, std::string	content);
 		~HTTPResponse();
 		HTTPResponse(const HTTPResponse &other);
 		const HTTPResponse	&operator=(const HTTPResponse &other);
@@ -47,6 +49,10 @@ class	HTTPResponse
 
 		/* Response */
 		void	addStatusLineToContent();
+
+		/* Simple Error Page Generation */
+		std::string HTTPResponse::generateErrorHTML(int code, const std::string &message) const;
+		std::string HTTPResponse::buildErrorResponse() const;
 
 		/* Utility */
 		void	trimBackslashR(std::string &line);

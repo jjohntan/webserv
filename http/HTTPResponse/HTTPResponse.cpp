@@ -9,6 +9,34 @@ HTTPResponse::HTTPResponse(std::string statusLine, std::string content, int sock
 	_socketFD(socketFD)
 {}
 
+/* For Error Page Generation - Default Body*/
+HTTPResponse::HTTPResponse(std::string status, int errorCode):
+	_statusCode(errorCode),
+	_statusMessage(status)
+{
+	std::ostringstream	stream;
+	stream << errorCode;
+	std::string	errorCodeStr = stream.str();
+	this->_modifyStatus = errorCodeStr + " " + status + "\r\n";
+	this->reformatStatusLine();
+	this->buildErrorResponse();
+	this->addStatusLineToContent();
+}
+
+/* For Error Page Generation - Passed in Body */
+HTTPResponse::HTTPResponse(std::string status, int errorCode, std::string content):
+	_statusCode(errorCode),
+	_statusMessage(status)
+{
+		std::ostringstream	stream;
+	stream << errorCode;
+	std::string	errorCodeStr = stream.str();
+	this->_modifyStatus = errorCodeStr + " " + status + "\r\n";
+	this->reformatStatusLine();
+	this->_content = content;
+	this->addStatusLineToContent();
+}
+
 HTTPResponse::HTTPResponse(const HTTPResponse &other):
 	_statusLine(other._statusLine),
 	_modifyStatus(other._modifyStatus),
@@ -187,6 +215,33 @@ void	HTTPResponse::extractStatusCodeAndMessage()
 void	HTTPResponse::addStatusLineToContent()
 {
 	this->_completeRawResponse = this->_formatedStatus + this->_content;
+}
+
+/***************************** ERROR PAGES GENERATION ******************* */
+
+std::string HTTPResponse::generateErrorHTML(int code, const std::string &message) const
+{
+	std::ostringstream stream;
+	stream	<< "<!DOCTYPE html>\n"
+			<< "<html>\n<head><title>" << code << " " << message << "</title></head>\n"
+			<< "<body><h1>" << code << " " << message << "</h1>\n"
+			<< "<p>Your request is failed to be processed.</p></body>\n</html>\n";
+	return (stream.str());
+}
+
+std::string HTTPResponse::buildErrorResponse() const
+{
+	this->_content = generateErrorHTML(_statusCode, _statusMessage);
+
+	std::ostringstream stream;
+	stream	<< this->_formatedStatus
+			<< "Content-Type: text/html\r\n"
+			<< "Content-Length: " << body.size() << "\r\n"
+			<< "Connection: close\r\n"
+			<< "\r\n"
+			<< this->_content;
+
+	return (stream.str());
 }
 
 /******************** UTILITY***************************** */
