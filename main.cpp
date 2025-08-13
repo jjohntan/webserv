@@ -31,7 +31,8 @@ int runWithConfig(const std::string& config_file) {
     std::cout << "Port: " << server_config.port << std::endl;
     std::cout << "Document root: " << server_config.root << std::endl;
     
-    Server server(server_config.port, server_config.root);
+    // Pass server configs to enable CGI support
+    Server server(server_config.port, server_config.root, servers);
     
     if (!server.start()) {
         return 1;
