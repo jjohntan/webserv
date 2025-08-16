@@ -7,8 +7,9 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
- #include <poll.h>
+#include <poll.h>
 
 class Server
 {
@@ -22,7 +23,7 @@ class Server
 		// destructor
 		~Server();
 	
-		int createListener();
+		int createListeningSocket();
 		void init();
 		void run();
 		// helper

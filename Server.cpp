@@ -1,6 +1,6 @@
 #include "Server.hpp"
 
-#define PORT "8080";
+#define PORT "8080"
 
 void Server::removeFromPfds()
 {
@@ -58,7 +58,7 @@ void Server::init()
 	
 }
 
-int Server::createListener()
+int Server::createListeningSocket()
 {
 	int yes = 1;
 	int rv;
@@ -70,10 +70,10 @@ int Server::createListener()
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 	
-	// if ((rv = getaddrinfo(NULL, PORT, &hints, &ai)) != 0)
-	// {
-		
-	// }
+	if ((rv = getaddrinfo(NULL, PORT, &hints, &ai)) != 0)
+	{
+		exit(1);
+	}
 	
 	for (p = ai; p != NULL; p = p->ai_next)
 	{
@@ -89,6 +89,15 @@ int Server::createListener()
 			continue;
 		}
 		break;
+	}
+	if (p == NULL)
+	{
+		return -1;
+	}
+	freeaddrinfo(ai);
+	if (listen(socket_fd, 10) == -1)
+	{
+		return -1;
 	}
 	return socket_fd;
 }
