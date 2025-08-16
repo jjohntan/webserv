@@ -2,21 +2,52 @@
 
 #define PORT "8080";
 
+void Server::removeFromPfds()
+{
+	client_fd--;
+}
+
+void Server::addToPfds()
+{
+	client_fd++;
+}
+
+void Server::readClientData()
+{
+	= recv();
+}
+
+void Server::addNewConnection()
+{
+	client_fd = accept();
+
+	if (client_fd == -1)
+	{
+	}
+	else
+	{
+		addToPfds();
+	}
+}
+
 void Server::run()
 {
 	while (true)
 	{
-		int = poll(listener, ,2000);
-		if ()
+		int ready_fd = poll(pfds, ,2000);
+		if (ready_fd < 0)
+		{
+			perror("poll failed");
+		}
 		for (int i = 0; i < ; i++)
 		{
-			if ( == listener)
+			if ( == socket_fd)
 			{
-				
+				addNewConnection();
 			}
 			else
 			{
-				
+				readClientData();
 			}
 		}
 	}
@@ -31,6 +62,7 @@ int Server::createListener()
 {
 	int yes = 1;
 	int rv;
+	
 	// hints: parameter specifies the preferred socket type, or protocol
 	struct addrinfo hints, *ai, *p;
 	memset(&hints, 0, sizeof(hints));
@@ -45,18 +77,18 @@ int Server::createListener()
 	
 	for (p = ai; p != NULL; p = p->ai_next)
 	{
-		listener = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-		if (listener < 0)
+		socket_fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+		if (socket_fd < 0)
 		{
 			continue;
 		}
-		setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
-		if (bind(listener, p->ai_addr, p->ai_addrlen) < 0)
+		setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+		if (bind(socket_fd, p->ai_addr, p->ai_addrlen) < 0)
 		{
-			close(listener);
+			close(socket_fd);
 			continue;
 		}
 		break;
 	}
-	return listener;
+	return socket_fd;
 }

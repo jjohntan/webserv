@@ -13,8 +13,9 @@
 class Server
 {
 	private:
-		int listener;
+		int socket_fd;
 		std::vector<struct pfd> pfds;
+		int client_fd;
 	public:
 		// constructor
 		Server(/* args */);
@@ -24,8 +25,11 @@ class Server
 		int createListener();
 		void init();
 		void run();
-		
 		// helper
+		void addNewConnection();
+		void readClientData();
+		void addToPfds();
+		void removeFromPfds();
 		
 };
 
