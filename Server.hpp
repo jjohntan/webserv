@@ -24,7 +24,7 @@ class Server
 		~Server();
 	
 		int createListeningSocket();
-		void init();
+		void setupListeningSocket();
 		void run();
 		// helper
 		void addNewConnection();

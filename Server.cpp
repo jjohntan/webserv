@@ -53,7 +53,7 @@ void Server::run()
 	}
 }
 
-void Server::init()
+void Server::setupListeningSocket()
 {
 	
 }
