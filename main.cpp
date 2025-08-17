@@ -7,13 +7,12 @@ int main()
 	
 	try
 	{
-		server.createListener();
-		server.init();
+		server.createListeningSocket();
 		server.run();
 	}
 	catch(const std::exception& e)
 	{
-		std::cerr << e.what() << '\n';
+		// std::cerr << e.what() << '\n';
 	}
 	
 }

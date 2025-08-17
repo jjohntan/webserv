@@ -2,60 +2,101 @@
 
 #define PORT "8080"
 
-void Server::removeFromPfds()
+void Server::removePfds(int i)
 {
-	client_fd--;
+	pfds.erase(pfds.begin() + i);
 }
 
-void Server::addToPfds()
+void Server::addPfds(int client_fd)
 {
-	client_fd++;
+	struct pollfd pfd;
+	pfd.fd = client_fd;
+	pfd.events = POLLIN;
+	pfd.revents = 0;
+	pfds.push_back(pfd);
 }
 
-void Server::readClientData()
+void Server::readClientData(int i)
 {
-	= recv();
+	char buf[1024];
+	int sender_fd = pfds[i].fd;
+	int bytes_received = recv(sender_fd, buf, sizeof(buf), 0);// receive incoming data from a connected client
+
+	if (bytes_received <= 0)
+	{
+		if (bytes_received == 0)
+		{
+			printf("server: socket %d closed\n", sender_fd);
+		}
+		else
+		{
+			perror("recv");
+		}
+		close(sender_fd);
+		removePfds(i);
+	}
+	else
+	{
+		printf("server: recv from fd %d: %s\n", sender_fd, buf);
+
+		for (int j = 0; j < pfds.size(); j++)
+		{
+			int dest_fd = pfds[j].fd;
+			if (dest_fd != socket_fd && dest_fd != sender_fd)
+			{
+				if (send(dest_fd, buf, bytes_received, 0) == -1)
+				{
+					perror("send");
+				}
+			}
+		}
+	}
 }
 
 void Server::addNewConnection()
 {
-	client_fd = accept();
+	struct sockaddr_storage remote_addr;
+	socklen_t addr_len = sizeof(remote_addr);
+	int client_fd = accept(socket_fd, (struct sockaddr *)&remote_addr, &addr_len);
 
 	if (client_fd == -1)
 	{
+		perror("accept");
 	}
 	else
 	{
-		addToPfds();
+		addPfds(client_fd);
 	}
 }
 
+// Main loop
 void Server::run()
 {
+	std::cout << "waiting for connections" << std::endl;
 	while (true)
 	{
-		int ready_fd = poll(pfds, ,2000);
+		int ready_fd = poll(pfds.data(), pfds.size(),-1);
 		if (ready_fd < 0)
 		{
 			perror("poll failed");
+			break;
 		}
-		for (int i = 0; i < ; i++)
+		for (int i = 0; i < pfds.size(); i++)
 		{
-			if ( == socket_fd)
+			if (pfds[i].revents & (POLLIN | POLLHUP))
 			{
-				addNewConnection();
+				if (pfds[i].fd == socket_fd)
+				{
+					addNewConnection();
+				}
+				else
+				{
+					readClientData(i);
+				}
 			}
-			else
-			{
-				readClientData();
-			}
+			pfds[i].revents = 0;
 		}
 	}
-}
-
-void Server::setupListeningSocket()
-{
-	
 }
 
 int Server::createListeningSocket()
@@ -97,7 +138,26 @@ int Server::createListeningSocket()
 	freeaddrinfo(ai);
 	if (listen(socket_fd, 10) == -1)
 	{
+		perror("listen");
 		return -1;
 	}
+	struct pollfd pfd;
+	pfd.fd = socket_fd;
+	pfd.events = POLLIN;
+	pfd.revents = 0;
+	pfds.push_back(pfd);
 	return socket_fd;
+}
+
+Server::Server(): socket_fd(-1)
+{
+
+}
+
+Server::~Server()
+{
+	for (size_t i = 0; i < pfds.size(); ++i)
+	{
+		close(pfds[i].fd);
+	}
 }
