@@ -32,8 +32,8 @@ class	HTTPResponse
 
 		HTTPResponse();
 	public:
-		HTTPResponse(std::string statusLine, std::string content, int socketFD);
-		HTTPResponse(std::string status, int errorCode);
+		HTTPResponse(std::string statusLine, std::string content, int socketFD); // normal response
+		HTTPResponse(std::string status, int errorCode); // default content error
 		HTTPResponse(std::string status, int errorCode, std::string	content);
 		~HTTPResponse();
 		HTTPResponse(const HTTPResponse &other);
@@ -72,7 +72,6 @@ class	HTTPResponse
 		void	setSocketFD(const int	socketFD);
 		void	setStatusCode(const int statusCode);
 		void	setStatusMessage(const std::string statusMessage);
-
 };
 
 #endif
