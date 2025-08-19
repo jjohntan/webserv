@@ -15,7 +15,7 @@
 class Server
 {
 	private:
-		int socket_fd;
+		int socket_fd;// store socket file descriptor
 		std::vector<struct pollfd> pfds;
 		// helper
 		void addNewConnection();

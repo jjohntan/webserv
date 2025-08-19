@@ -55,9 +55,9 @@ void Server::readClientData(int i)
 
 void Server::addNewConnection()
 {
-	struct sockaddr_storage remote_addr;
-	socklen_t addr_len = sizeof(remote_addr);
-	int client_fd = accept(socket_fd, (struct sockaddr *)&remote_addr, &addr_len);
+	struct sockaddr_storage client_addr;
+	socklen_t addr_len = sizeof(client_addr);
+	int client_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &addr_len);
 
 	if (client_fd == -1)
 	{
@@ -101,29 +101,35 @@ void Server::run()
 
 int Server::createListeningSocket()
 {
-	int yes = 1;
+	int opt = 1;
 	int rv;
 	
 	// hints: parameter specifies the preferred socket type, or protocol
 	struct addrinfo hints, *ai, *p;
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_family = AF_INET;// use IPV4
+	hints.ai_socktype = SOCK_STREAM;// use TCP
 	hints.ai_flags = AI_PASSIVE;
 	
 	if ((rv = getaddrinfo(NULL, PORT, &hints, &ai)) != 0)
 	{
+		fprintf(stderr, "server: &s\n", rv);
 		exit(1);
 	}
 	
 	for (p = ai; p != NULL; p = p->ai_next)
 	{
+		// creating socket
 		socket_fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
 		if (socket_fd < 0)
 		{
 			continue;
 		}
-		setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+		
+		// setting serverFd to allow multiple connection
+		setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
+		
+		// binding socket to the network address and port
 		if (bind(socket_fd, p->ai_addr, p->ai_addrlen) < 0)
 		{
 			close(socket_fd);
@@ -136,13 +142,15 @@ int Server::createListeningSocket()
 		return -1;
 	}
 	freeaddrinfo(ai);
+	
+	//listening for incoming connection
 	if (listen(socket_fd, 10) == -1)
 	{
 		perror("listen");
 		return -1;
 	}
 	struct pollfd pfd;
-	pfd.fd = socket_fd;
+	pfd.fd = socket_fd;// monitor server socket
 	pfd.events = POLLIN;
 	pfd.revents = 0;
 	pfds.push_back(pfd);
@@ -161,3 +169,19 @@ Server::~Server()
 		close(pfds[i].fd);
 	}
 }
+
+	// Server
+
+	// socket
+	//    |
+	// bind
+	//    |
+	// listen
+	//    |
+	// accept
+	//    |
+	// recv
+	//    |
+	// send
+	//    |
+	// recv
