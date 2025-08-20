@@ -1,0 +1,311 @@
+#include "cgi.hpp"
+
+// C++98 compatible string conversion
+std::string intToString(int value) {
+    std::ostringstream oss;
+    oss << value;
+    return oss.str();
+}
+
+CGIHandler::CGIHandler() {}
+
+CGIHandler::~CGIHandler() {}
+
+bool CGIHandler::needsCGI(const std::string& filepath, const std::map<std::string, std::string>& cgi_extensions) {
+    return isCGIScript(filepath, cgi_extensions);
+}
+
+std::string CGIHandler::extractScriptName(const std::string& uri) {
+    size_t query_pos = uri.find('?');
+    if (query_pos != std::string::npos) {
+        return uri.substr(0, query_pos);
+    }
+    return uri;
+}
+
+std::string CGIHandler::extractQueryString(const std::string& path) {
+    size_t question_pos = path.find('?');
+    if (question_pos != std::string::npos && question_pos + 1 < path.length()) {
+        return path.substr(question_pos + 1);
+    }
+    return "";
+}
+
+void CGIHandler::clearEnvironment() {
+    env_vars.clear();
+}
+
+std::string CGIHandler::getFileExtension(const std::string& filepath) {
+    size_t dot_pos = filepath.find_last_of('.');
+    if (dot_pos != std::string::npos && dot_pos < filepath.length() - 1) {
+        return filepath.substr(dot_pos);
+    }
+    return "";
+}
+
+bool CGIHandler::isCGIScript(const std::string& filepath, const std::map<std::string, std::string>& cgi_extensions) {
+    std::string extension = getFileExtension(filepath);
+    return cgi_extensions.find(extension) != cgi_extensions.end();
+}
+
+std::string CGIHandler::findCGIExecutor(const std::string& extension, const std::map<std::string, std::string>& cgi_extensions) {
+    std::map<std::string, std::string>::const_iterator it = cgi_extensions.find(extension);
+    if (it != cgi_extensions.end()) {
+        return it->second;
+    }
+    return "";
+}
+
+void CGIHandler::addEnvironmentVar(const std::string& key, const std::string& value) {
+    env_vars[key] = value;
+}
+
+std::string CGIHandler::toUpperCase(const std::string& str) {
+    std::string result = str;
+    for (size_t i = 0; i < result.length(); ++i) {
+        if (result[i] == '-') {
+            result[i] = '_';
+        } else {
+            result[i] = std::toupper(result[i]);
+        }
+    }
+    return result;
+}
+
+void CGIHandler::setupEnvironment(const HTTPRequest& request, const std::string& script_path, const std::string& query_string) {
+    env_vars.clear();
+    setupStandardCGIVars(request, script_path, query_string);
+    setupHTTPHeaders(request);
+}
+
+void CGIHandler::setupStandardCGIVars(const HTTPRequest& request, const std::string& script_path, const std::string& query_string) {
+    // Standard CGI environment variables using HTTPRequest getters
+    addEnvironmentVar("REQUEST_METHOD", request.getMethod());
+    addEnvironmentVar("SCRIPT_NAME", script_path);
+    addEnvironmentVar("PATH_INFO", script_path);
+    addEnvironmentVar("QUERY_STRING", query_string);
+    addEnvironmentVar("SERVER_PROTOCOL", request.getVersion());
+    addEnvironmentVar("GATEWAY_INTERFACE", "CGI/1.1");
+    addEnvironmentVar("SERVER_SOFTWARE", "webserv/1.0");
+    
+    // Server information (you might need to pass these from your server)
+    addEnvironmentVar("SERVER_NAME", "localhost");
+    addEnvironmentVar("SERVER_PORT", "8080");
+    addEnvironmentVar("REMOTE_ADDR", "127.0.0.1");
+    
+    // Content length and type for POST requests
+    if (request.getMethod() == "POST") {
+        const std::vector<char>& body = request.getBodyVector();
+        addEnvironmentVar("CONTENT_LENGTH", intToString(body.size()));
+        
+        // Get content type from headers
+        const std::map<std::string, std::string>& headers = request.getHeaderMap();
+        std::map<std::string, std::string>::const_iterator ct_it = headers.find("content-type");
+        if (ct_it != headers.end()) {
+            addEnvironmentVar("CONTENT_TYPE", ct_it->second);
+        } else {
+            addEnvironmentVar("CONTENT_TYPE", "application/x-www-form-urlencoded");
+        }
+    } else {
+        addEnvironmentVar("CONTENT_LENGTH", "0");
+    }
+}
+
+void CGIHandler::setupHTTPHeaders(const HTTPRequest& request) {
+    const std::map<std::string, std::string>& headers = request.getHeaderMap();
+    
+    // Convert HTTP headers to CGI environment variables
+    for (std::map<std::string, std::string>::const_iterator it = headers.begin();
+         it != headers.end(); ++it) {
+        std::string key = "HTTP_" + toUpperCase(it->first);
+        addEnvironmentVar(key, it->second);
+    }
+}
+
+char** CGIHandler::createEnvArray() {
+    char** env = new char*[env_vars.size() + 1];
+    size_t i = 0;
+    
+    for (std::map<std::string, std::string>::const_iterator it = env_vars.begin();
+         it != env_vars.end(); ++it, ++i) {
+        std::string env_string = it->first + "=" + it->second;
+        env[i] = new char[env_string.length() + 1];
+        std::strcpy(env[i], env_string.c_str());
+    }
+    env[i] = NULL;
+    
+    return env;
+}
+
+void CGIHandler::freeEnvArray(char** env) {
+    if (!env) return;
+    
+    for (size_t i = 0; env[i]; ++i) {
+        delete[] env[i];
+    }
+    delete[] env;
+}
+
+void CGIHandler::parseOutput(const std::string& output, CGIResult& result) {
+    if (output.empty()) {
+        result.success = false;
+        result.status_code = 500;
+        return;
+    }
+    
+    result.output = output;
+    
+    // Find the double CRLF that separates headers from body
+    size_t header_end = output.find("\r\n\r\n");
+    if (header_end == std::string::npos) {
+        header_end = output.find("\n\n");
+        if (header_end != std::string::npos) {
+            header_end += 2; // "\n\n" is 2 chars
+        }
+    } else {
+        header_end += 4; // "\r\n\r\n" is 4 chars
+    }
+    
+    if (header_end != std::string::npos) {
+        result.headers = output.substr(0, header_end - 4); // Exclude the double CRLF
+        if (header_end < output.length()) {
+            result.body = output.substr(header_end);
+        }
+    } else {
+        // No headers found, treat entire output as body
+        result.body = output;
+        result.headers = "Content-Type: text/html";
+    }
+    
+    result.success = true;
+    result.status_code = 200;
+}
+
+CGIResult CGIHandler::executeCGI(const HTTPRequest& request, 
+                                const std::string& script_path,
+                                const std::map<std::string, std::string>& cgi_extensions,
+                                const std::string& working_directory) {
+    CGIResult result;
+    
+    // Check if this is a CGI script
+    if (!isCGIScript(script_path, cgi_extensions)) {
+        result.success = false;
+        result.status_code = 404;
+        return result;
+    }
+    
+    // Find the appropriate executor
+    std::string extension = getFileExtension(script_path);
+    std::string executor = findCGIExecutor(extension, cgi_extensions);
+    if (executor.empty()) {
+        result.success = false;
+        result.status_code = 500;
+        return result;
+    }
+    
+    // Extract query string from request path
+    std::string query_string = extractQueryString(request.getPath());
+    
+    // Setup environment
+    setupEnvironment(request, script_path, query_string);
+    
+    // Create pipes for communication
+    int input_pipe[2];
+    int output_pipe[2];
+    
+    if (pipe(input_pipe) == -1 || pipe(output_pipe) == -1) {
+        result.success = false;
+        result.status_code = 500;
+        return result;
+    }
+    
+    // Create environment array
+    char** env = createEnvArray();
+    
+    // Fork process
+    pid_t pid = fork();
+    if (pid == -1) {
+        close(input_pipe[0]);
+        close(input_pipe[1]);
+        close(output_pipe[0]);
+        close(output_pipe[1]);
+        freeEnvArray(env);
+        result.success = false;
+        result.status_code = 500;
+        return result;
+    }
+    
+    if (pid == 0) {
+        // Child process
+        
+        // Change to working directory if specified
+        if (!working_directory.empty() && chdir(working_directory.c_str()) != 0) {
+            exit(1);
+        }
+        
+        // Redirect stdin and stdout
+        dup2(input_pipe[0], STDIN_FILENO);
+        dup2(output_pipe[1], STDOUT_FILENO);
+        
+        // Close unused pipe ends
+        close(input_pipe[1]);
+        close(output_pipe[0]);
+        close(input_pipe[0]);
+        close(output_pipe[1]);
+        
+        // Prepare arguments - script path as first argument as per webserv requirements
+        char* args[3];
+        args[0] = const_cast<char*>(executor.c_str());
+        args[1] = const_cast<char*>(script_path.c_str());
+        args[2] = NULL;
+        
+        // Execute CGI script
+        execve(executor.c_str(), args, env);
+        exit(1);  // execve failed
+    } else {
+        // Parent process
+        
+        // Close unused pipe ends
+        close(input_pipe[0]);
+        close(output_pipe[1]);
+        
+        // Send request body to CGI script (for POST requests)
+        if (request.getMethod() == "POST") {
+            const std::vector<char>& body = request.getBodyVector();
+            if (!body.empty()) {
+                ssize_t bytes_written = write(input_pipe[1], &body[0], body.size());
+                (void)bytes_written; // Avoid unused variable warning
+            }
+        }
+        close(input_pipe[1]);  // Close input to signal EOF
+        
+        // Read response from CGI script
+        std::string output;
+        char buffer[4096];
+        ssize_t bytes_read;
+        
+        while ((bytes_read = read(output_pipe[0], buffer, sizeof(buffer))) > 0) {
+            output.append(buffer, bytes_read);
+        }
+        close(output_pipe[0]);
+        
+        // Wait for child process to complete
+        int status;
+        waitpid(pid, &status, 0);
+        
+        // Clean up
+        freeEnvArray(env);
+        
+        // Check if CGI script executed successfully
+        if (WEXITSTATUS(status) != 0) {
+            result.success = false;
+            result.status_code = 500;
+            return result;
+        }
+        
+        // Parse the output
+        parseOutput(output, result);
+        
+        return result;
+    }
+}
