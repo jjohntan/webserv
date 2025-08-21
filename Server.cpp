@@ -1,6 +1,6 @@
 #include "Server.hpp"
 
-#define PORT "8080"
+#include <set>
 
 void Server::removePfds(int i)
 {
@@ -39,7 +39,7 @@ void Server::readClientData(int i)
 	{
 		printf("server: recv from fd %d: %s\n", sender_fd, buf);
 
-		for (int j = 0; j < pfds.size(); j++)
+		for (unsigned int j = 0; j < pfds.size(); j++)
 		{
 			int dest_fd = pfds[j].fd;
 			if (dest_fd != socket_fd && dest_fd != sender_fd)
@@ -81,7 +81,7 @@ void Server::run()
 			perror("poll failed");
 			break;
 		}
-		for (int i = 0; i < pfds.size(); i++)
+		for (unsigned int i = 0; i < pfds.size(); i++)
 		{
 			if (pfds[i].revents & (POLLIN | POLLHUP))
 			{
@@ -99,7 +99,44 @@ void Server::run()
 	}
 }
 
-int Server::createListeningSocket()
+Server::Server(): socket_fd(-1)
+{
+
+}
+
+Server::Server(int port, const std::string& root, const std::vector<ServerConfig>& servers)
+: socket_fd(-1), servers(servers), root(root)
+{
+	(void)port; // legacy single-port ctor keeps signature but real ports come from servers vector
+}
+
+bool Server::start()
+{
+	// collect unique ports from servers and create a listening socket for each
+	std::set<int> ports;
+	for (size_t i = 0; i < servers.size(); ++i) {
+		ports.insert(servers[i].port);
+	}
+	// if no servers provided, fall back to default socket_fd if previously set
+	if (ports.empty()) {
+		// try to create a default listener on 8080
+		int fd = createListeningSocket(std::string("8080"));
+		return fd >= 0;
+	}
+
+	for (std::set<int>::const_iterator it = ports.begin(); it != ports.end(); ++it) {
+		std::ostringstream oss;
+		oss << *it;
+		int fd = createListeningSocket(oss.str());
+		if (fd < 0) {
+			std::cerr << "Failed to create listening socket on port " << *it << std::endl;
+			return false;
+		}
+	}
+	return true;
+}
+
+int Server::createListeningSocket(const std::string& port_str)
 {
 	int opt = 1;
 	int rv;
@@ -110,17 +147,17 @@ int Server::createListeningSocket()
 	hints.ai_family = AF_INET;// use IPV4
 	hints.ai_socktype = SOCK_STREAM;// use TCP
 	hints.ai_flags = AI_PASSIVE;
-	
-	if ((rv = getaddrinfo(NULL, PORT, &hints, &ai)) != 0)
+    
+	if ((rv = getaddrinfo(NULL, port_str.c_str(), &hints, &ai)) != 0)
 	{
-		fprintf(stderr, "server: &s\n", rv);
-		exit(1);
+		fprintf(stderr, "server: %s\n", gai_strerror(rv));
+		return -1;
 	}
 	
 	for (p = ai; p != NULL; p = p->ai_next)
 	{
 		// creating socket
-		socket_fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+		socket_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
 		if (socket_fd < 0)
 		{
 			continue;
@@ -155,11 +192,6 @@ int Server::createListeningSocket()
 	pfd.revents = 0;
 	pfds.push_back(pfd);
 	return socket_fd;
-}
-
-Server::Server(): socket_fd(-1)
-{
-
 }
 
 Server::~Server()
