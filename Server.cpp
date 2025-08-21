@@ -1,7 +1,5 @@
 #include "Server.hpp"
 
-#include <set>
-
 void Server::removePfds(int i)
 {
 	pfds.erase(pfds.begin() + i);
@@ -21,7 +19,9 @@ void Server::readClientData(int i)
 	char buf[1024];
 	int sender_fd = pfds[i].fd;
 	int bytes_received = recv(sender_fd, buf, sizeof(buf), 0);// receive incoming data from a connected client
-
+	if (bytes_received > 0)
+		buf[bytes_received] = '\0';
+	
 	if (bytes_received <= 0)
 	{
 		if (bytes_received == 0)
@@ -44,20 +44,26 @@ void Server::readClientData(int i)
 			int dest_fd = pfds[j].fd;
 			if (dest_fd != socket_fd && dest_fd != sender_fd)
 			{
-				if (send(dest_fd, buf, bytes_received, 0) == -1)
-				{
-					perror("send");
-				}
+				const char *response = "HTTP/1.1 200 OK\r\n"
+                       "Content-Length: 13\r\n"
+                       "Content-Type: text/plain\r\n"
+                       "\r\n"
+                       "Hello, world!";
+				send(sender_fd, response, strlen(response), 0);// hardcode
+				// if (send(dest_fd, buf, bytes_received, 0) == -1)
+				// {
+				// 	perror("send");
+				// }
 			}
 		}
 	}
 }
 
-void Server::addNewConnection()
+void Server::addNewConnection(int listen_fd)
 {
 	struct sockaddr_storage client_addr;
 	socklen_t addr_len = sizeof(client_addr);
-	int client_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &addr_len);
+	int client_fd = accept(listen_fd, (struct sockaddr *)&client_addr, &addr_len);
 
 	if (client_fd == -1)
 	{
@@ -70,44 +76,92 @@ void Server::addNewConnection()
 }
 
 // Main loop
+bool Server::isListeningSocket(int fd) {
+    for (size_t i = 0; i < listening_sockets.size(); i++) {
+        if (listening_sockets[i] == fd)
+            return true;
+    }
+    return false;
+}
+
 void Server::run()
 {
-	std::cout << "waiting for connections" << std::endl;
-	while (true)
-	{
-		int ready_fd = poll(pfds.data(), pfds.size(),-1);
-		if (ready_fd < 0)
-		{
-			perror("poll failed");
-			break;
-		}
-		for (unsigned int i = 0; i < pfds.size(); i++)
-		{
-			if (pfds[i].revents & (POLLIN | POLLHUP))
-			{
-				if (pfds[i].fd == socket_fd)
+    std::cout << "waiting for connections" << std::endl;
+    while (true)
+    {
+        int ready_fd = poll(pfds.data(), pfds.size(), -1);
+        if (ready_fd < 0) {
+            perror("poll failed");
+            break;
+        }
+
+        for (size_t i = 0; i < pfds.size(); i++) {
+            if (pfds[i].revents & (POLLIN | POLLHUP)) {
+                if (isListeningSocket(pfds[i].fd))
 				{
-					addNewConnection();
-				}
+                    addNewConnection(pfds[i].fd);
+                }
 				else
 				{
-					readClientData(i);
-				}
-			}
-			pfds[i].revents = 0;
-		}
-	}
+                    readClientData(i);
+                }
+            }
+            pfds[i].revents = 0;
+        }
+    }
 }
 
-Server::Server(): socket_fd(-1)
+int Server::createListeningSocket(const std::string& port_str)
 {
+    int opt = 1;
+    int rv;
+    struct addrinfo hints, *ai, *p;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;       // use IPv4
+    hints.ai_socktype = SOCK_STREAM; // TCP
+    hints.ai_flags = AI_PASSIVE;
 
-}
+    if ((rv = getaddrinfo(NULL, port_str.c_str(), &hints, &ai)) != 0) {
+        fprintf(stderr, "server: %s\n", gai_strerror(rv));
+        return -1;
+    }
 
-Server::Server(int port, const std::string& root, const std::vector<ServerConfig>& servers)
-: socket_fd(-1), servers(servers), root(root)
-{
-	(void)port; // legacy single-port ctor keeps signature but real ports come from servers vector
+    int sockfd = -1;
+    for (p = ai; p != NULL; p = p->ai_next) {
+        sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (sockfd < 0) continue;
+
+        setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
+
+        if (bind(sockfd, p->ai_addr, p->ai_addrlen) < 0) {
+            close(sockfd);
+            sockfd = -1;
+            continue;
+        }
+        break;
+    }
+
+    freeaddrinfo(ai);
+
+    if (sockfd < 0) return -1;
+
+    if (listen(sockfd, 10) == -1) {
+        perror("listen");
+        close(sockfd);
+        return -1;
+    }
+
+    // keep track of listening socket
+    listening_sockets.push_back(sockfd);
+
+    // also add to poll set
+    struct pollfd pfd;
+    pfd.fd = sockfd;
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+    pfds.push_back(pfd);
+
+    return sockfd;
 }
 
 bool Server::start()
@@ -136,62 +190,15 @@ bool Server::start()
 	return true;
 }
 
-int Server::createListeningSocket(const std::string& port_str)
+Server::Server()
 {
-	int opt = 1;
-	int rv;
-	
-	// hints: parameter specifies the preferred socket type, or protocol
-	struct addrinfo hints, *ai, *p;
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;// use IPV4
-	hints.ai_socktype = SOCK_STREAM;// use TCP
-	hints.ai_flags = AI_PASSIVE;
-    
-	if ((rv = getaddrinfo(NULL, port_str.c_str(), &hints, &ai)) != 0)
-	{
-		fprintf(stderr, "server: %s\n", gai_strerror(rv));
-		return -1;
-	}
-	
-	for (p = ai; p != NULL; p = p->ai_next)
-	{
-		// creating socket
-		socket_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-		if (socket_fd < 0)
-		{
-			continue;
-		}
-		
-		// setting serverFd to allow multiple connection
-		setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
-		
-		// binding socket to the network address and port
-		if (bind(socket_fd, p->ai_addr, p->ai_addrlen) < 0)
-		{
-			close(socket_fd);
-			continue;
-		}
-		break;
-	}
-	if (p == NULL)
-	{
-		return -1;
-	}
-	freeaddrinfo(ai);
-	
-	//listening for incoming connection
-	if (listen(socket_fd, 10) == -1)
-	{
-		perror("listen");
-		return -1;
-	}
-	struct pollfd pfd;
-	pfd.fd = socket_fd;// monitor server socket
-	pfd.events = POLLIN;
-	pfd.revents = 0;
-	pfds.push_back(pfd);
-	return socket_fd;
+
+}
+
+Server::Server(int port, const std::string& root, const std::vector<ServerConfig>& servers)
+: socket_fd(-1), servers(servers), root(root)
+{
+	(void)port; // legacy single-port ctor keeps signature but real ports come from servers vector
 }
 
 Server::~Server()
