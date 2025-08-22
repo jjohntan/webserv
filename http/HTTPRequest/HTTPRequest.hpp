@@ -20,6 +20,7 @@
 class	HTTPRequest
 {
 	private:
+		int			_socketFD;
 		std::string	_rawString;
 		std::string	_rawHeader;
 		std::string	_rawBody;
@@ -69,6 +70,7 @@ class	HTTPRequest
 
 	public:
 		HTTPRequest();
+		HTTPRequest(int socketFD);
 		~HTTPRequest();
 		HTTPRequest(const HTTPRequest &other);
 		const HTTPRequest	&operator=(const HTTPRequest &other);

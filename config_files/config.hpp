@@ -12,11 +12,6 @@ struct Location {
     std::string path;
     std::string index;
     std::vector<std::string> allowed_methods;
-    std::string upload_path;
-    bool autoindex;
-    std::map<std::string, std::string> cgi_extensions; 
-    
-    Location() : autoindex(false) {}
 };
 
 struct ServerConfig {

@@ -88,18 +88,11 @@ void ConfigParser::printConfig(const std::vector<ServerConfig>& servers) {
             const Location& location = server.locations[j];
             std::cout << "    Path: " << location.path << std::endl;
             std::cout << "    Index: " << location.index << std::endl;
-            std::cout << "    Upload Path: " << location.upload_path << std::endl;
-            std::cout << "    Autoindex: " << (location.autoindex ? "on" : "off") << std::endl;
             std::cout << "    Methods: ";
             for (size_t k = 0; k < location.allowed_methods.size(); ++k) {
                 std::cout << location.allowed_methods[k] << " ";
             }
             std::cout << std::endl;
-            std::cout << "    CGI Extensions:" << std::endl;
-            for (std::map<std::string, std::string>::const_iterator it = location.cgi_extensions.begin();
-                 it != location.cgi_extensions.end(); ++it) {
-                std::cout << "      " << it->first << " -> " << it->second << std::endl;
-            }
         }
     }
 }
@@ -193,30 +186,5 @@ void ConfigParser::parseLocationDirective(const std::string& line, Location& loc
             location.allowed_methods.push_back(method);
         }
         std::cout << "    Methods parsed" << std::endl;
-    }
-    else if (directive == "upload_path") {
-        iss >> location.upload_path;
-        if (!location.upload_path.empty() && location.upload_path[location.upload_path.length() - 1] == ';') {
-            location.upload_path = location.upload_path.substr(0, location.upload_path.length() - 1);
-        }
-        std::cout << "    Upload path: " << location.upload_path << std::endl;
-    }
-    else if (directive == "autoindex") {
-        std::string value;
-        iss >> value;
-        if (!value.empty() && value[value.length() - 1] == ';') {
-            value = value.substr(0, value.length() - 1);
-        }
-        location.autoindex = (value == "on" || value == "true");
-        std::cout << "    Autoindex: " << (location.autoindex ? "on" : "off") << std::endl;
-    }
-    else if (directive == "cgi_extension") {
-        std::string extension, executor;
-        iss >> extension >> executor;
-        if (!executor.empty() && executor[executor.length() - 1] == ';') {
-            executor = executor.substr(0, executor.length() - 1);
-        }
-        location.cgi_extensions[extension] = executor;
-        std::cout << "    CGI extension: " << extension << " -> " << executor << std::endl;
     }
 }

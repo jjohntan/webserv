@@ -23,7 +23,6 @@ RM = rm -f
 
 # Source and Object
 SRCS =	main.cpp \
-		Request.cpp \
 		HTTPRequest.cpp \
 
 OBJ = $(SRCS:.cpp=.o)
