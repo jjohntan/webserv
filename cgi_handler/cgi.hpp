@@ -43,6 +43,7 @@ private:
     char** createEnvArray();
     void freeEnvArray(char** env);
     std::string toUpperCase(const std::string& str);
+    std::string normalizePath(const std::string& path);
     
 public:
     CGIHandler();

@@ -1,14 +1,16 @@
 #include "cgi.hpp"
 
-// C++98 compatible string conversion
 std::string intToString(int value) {
     std::ostringstream oss;
     oss << value;
     return oss.str();
 }
 
+//constructor
 CGIHandler::CGIHandler() {}
 
+
+//destructor
 CGIHandler::~CGIHandler() {}
 
 bool CGIHandler::needsCGI(const std::string& filepath, const std::map<std::string, std::string>& cgi_extensions) {
@@ -35,6 +37,7 @@ void CGIHandler::clearEnvironment() {
     env_vars.clear();
 }
 
+// read file extension
 std::string CGIHandler::getFileExtension(const std::string& filepath) {
     size_t dot_pos = filepath.find_last_of('.');
     if (dot_pos != std::string::npos && dot_pos < filepath.length() - 1) {
@@ -48,6 +51,12 @@ bool CGIHandler::isCGIScript(const std::string& filepath, const std::map<std::st
     return cgi_extensions.find(extension) != cgi_extensions.end();
 }
 
+/*
+check if the file extension is in the cgi_extensions map
+
+-> something like this  ( cgi_extensions[".py"] = "/usr/bin/python3";)
+if extension not found, return empty string
+*/
 std::string CGIHandler::findCGIExecutor(const std::string& extension, const std::map<std::string, std::string>& cgi_extensions) {
     std::map<std::string, std::string>::const_iterator it = cgi_extensions.find(extension);
     if (it != cgi_extensions.end()) {
@@ -72,54 +81,22 @@ std::string CGIHandler::toUpperCase(const std::string& str) {
     return result;
 }
 
-void CGIHandler::setupEnvironment(const HTTPRequest& request, const std::string& script_path, const std::string& query_string) {
-    env_vars.clear();
-    setupStandardCGIVars(request, script_path, query_string);
-    setupHTTPHeaders(request);
-}
-
-void CGIHandler::setupStandardCGIVars(const HTTPRequest& request, const std::string& script_path, const std::string& query_string) {
-    // Standard CGI environment variables using HTTPRequest getters
-    addEnvironmentVar("REQUEST_METHOD", request.getMethod());
-    addEnvironmentVar("SCRIPT_NAME", script_path);
-    addEnvironmentVar("PATH_INFO", script_path);
-    addEnvironmentVar("QUERY_STRING", query_string);
-    addEnvironmentVar("SERVER_PROTOCOL", request.getVersion());
-    addEnvironmentVar("GATEWAY_INTERFACE", "CGI/1.1");
-    addEnvironmentVar("SERVER_SOFTWARE", "webserv/1.0");
+std::string CGIHandler::normalizePath(const std::string& path) {
+    std::string result = path;
     
-    // Server information (you might need to pass these from your server)
-    addEnvironmentVar("SERVER_NAME", "localhost");
-    addEnvironmentVar("SERVER_PORT", "8080");
-    addEnvironmentVar("REMOTE_ADDR", "127.0.0.1");
-    
-    // Content length and type for POST requests
-    if (request.getMethod() == "POST") {
-        const std::vector<char>& body = request.getBodyVector();
-        addEnvironmentVar("CONTENT_LENGTH", intToString(body.size()));
-        
-        // Get content type from headers
-        const std::map<std::string, std::string>& headers = request.getHeaderMap();
-        std::map<std::string, std::string>::const_iterator ct_it = headers.find("content-type");
-        if (ct_it != headers.end()) {
-            addEnvironmentVar("CONTENT_TYPE", ct_it->second);
-        } else {
-            addEnvironmentVar("CONTENT_TYPE", "application/x-www-form-urlencoded");
-        }
-    } else {
-        addEnvironmentVar("CONTENT_LENGTH", "0");
+    // Remove duplicate slashes
+    size_t pos = 0;
+    while ((pos = result.find("//", pos)) != std::string::npos) {
+        result.erase(pos, 1);
     }
-}
-
-void CGIHandler::setupHTTPHeaders(const HTTPRequest& request) {
-    const std::map<std::string, std::string>& headers = request.getHeaderMap();
     
-    // Convert HTTP headers to CGI environment variables
-    for (std::map<std::string, std::string>::const_iterator it = headers.begin();
-         it != headers.end(); ++it) {
-        std::string key = "HTTP_" + toUpperCase(it->first);
-        addEnvironmentVar(key, it->second);
+    // Remove duplicate "./cgi_bin" if it appears twice
+    pos = result.find("./cgi_bin/./cgi_bin");
+    if (pos != std::string::npos) {
+        result.erase(pos, 11); // Remove first "./cgi_bin/"
     }
+    
+    return result;
 }
 
 char** CGIHandler::createEnvArray() {
@@ -146,6 +123,64 @@ void CGIHandler::freeEnvArray(char** env) {
     delete[] env;
 }
 
+void CGIHandler::setupHTTPHeaders(const HTTPRequest& request) {
+    const std::map<std::string, std::string>& headers = request.getHeaderMap();
+    
+    // Convert HTTP headers to CGI environment variables
+    for (std::map<std::string, std::string>::const_iterator it = headers.begin();
+         it != headers.end(); ++it) {
+        std::string key = "HTTP_" + toUpperCase(it->first);
+        addEnvironmentVar(key, it->second);
+    }
+}
+
+// this is where cgi function start ( main ) =================================
+void CGIHandler::setupEnvironment(const HTTPRequest& request, const std::string& script_path, const std::string& query_string) {
+    env_vars.clear();
+    setupStandardCGIVars(request, script_path, query_string);
+    setupHTTPHeaders(request);
+}
+
+void CGIHandler::setupStandardCGIVars(const HTTPRequest& request, const std::string& script_path, const std::string& query_string) {
+    //  HTTPRequest getters (from nelson)
+    addEnvironmentVar("REQUEST_METHOD", request.getMethod());
+    addEnvironmentVar("SCRIPT_NAME", script_path);
+    addEnvironmentVar("PATH_INFO", script_path);
+    addEnvironmentVar("QUERY_STRING", query_string);
+    addEnvironmentVar("SERVER_PROTOCOL", request.getVersion());
+    addEnvironmentVar("GATEWAY_INTERFACE", "CGI/1.1");
+    addEnvironmentVar("SERVER_SOFTWARE", "webserv/1.0");
+    
+    // Server information 
+    addEnvironmentVar("SERVER_NAME", "localhost");
+    addEnvironmentVar("SERVER_PORT", "8080");
+    addEnvironmentVar("REMOTE_ADDR", "127.0.0.1");
+    
+    // Content length and type for POST requests
+    if (request.getMethod() == "POST") {
+        const std::vector<char>& body = request.getBodyVector();
+        addEnvironmentVar("CONTENT_LENGTH", intToString(body.size()));
+        
+        // Get content type from headers
+        const std::map<std::string, std::string>& headers = request.getHeaderMap();
+        std::map<std::string, std::string>::const_iterator ct_it = headers.find("content-type");
+        if (ct_it != headers.end()) {
+            addEnvironmentVar("CONTENT_TYPE", ct_it->second);
+        } else {
+            addEnvironmentVar("CONTENT_TYPE", "application/x-www-form-urlencoded");
+        }
+    } else {
+        addEnvironmentVar("CONTENT_LENGTH", "0");
+    }
+}
+
+
+/*
+split into
+result.headers
+result.body
+Marks result.success = true
+*/
 void CGIHandler::parseOutput(const std::string& output, CGIResult& result) {
     if (output.empty()) {
         result.success = false;
@@ -153,7 +188,7 @@ void CGIHandler::parseOutput(const std::string& output, CGIResult& result) {
         return;
     }
     
-    result.output = output;
+    result.output = output;  // full raw output
     
     // Find the double CRLF that separates headers from body
     size_t header_end = output.find("\r\n\r\n");
@@ -187,29 +222,59 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
                                 const std::string& working_directory) {
     CGIResult result;
     
-    // Check if this is a CGI script
-    if (!isCGIScript(script_path, cgi_extensions)) {
+    std::cout << "[DEBUG] CGI executeCGI - Original script_path: " << script_path << std::endl;
+    std::cout << "[DEBUG] CGI executeCGI - Working directory: " << working_directory << std::endl;
+    
+    /*
+    clean up the path to remove things like:
+            Double slashes (//)
+            . and .. references
+            Any accidental duplicates (cgi_bin/cgi_bin/...)
+    */
+    std::string normalized_script_path = normalizePath(script_path);
+    std::cout << "[DEBUG] CGI executeCGI - Normalized script_path: " << normalized_script_path << std::endl;
+    
+    // check whether is CGI script (.py) , if not then 404
+    if (!isCGIScript(normalized_script_path, cgi_extensions)) {
         result.success = false;
         result.status_code = 404;
         return result;
     }
     
     // Find the appropriate executor
-    std::string extension = getFileExtension(script_path);
+    std::string extension = getFileExtension(normalized_script_path);
     std::string executor = findCGIExecutor(extension, cgi_extensions);
+    std::cout << "[DEBUG] CGI executeCGI - Extension: " << extension << std::endl;
+    std::cout << "[DEBUG] CGI executeCGI - Executor: " << executor << std::endl;
+    
     if (executor.empty()) {
         result.success = false;
         result.status_code = 500;
         return result;
     }
     
-    // Extract query string from request path
+    /*
+    /cgi-bin/python/hello.py?name=World
+    Script path: /cgi-bin/python/hello.py
+    Query string: name=World
+    */
     std::string query_string = extractQueryString(request.getPath());
     
     // Setup environment
-    setupEnvironment(request, script_path, query_string);
+    /*
+    prepares variables like:
+
+    REQUEST_METHOD=GET
+    QUERY_STRING=name=World
+    CONTENT_LENGTH=...
+    SCRIPT_FILENAME=/path/to/hello.py
+    */
+    setupEnvironment(request, normalized_script_path, query_string);
     
-    // Create pipes for communication
+    /*
+    input_pipe → parent writes POST body, child reads it as stdin.
+    output_pipe → child writes CGI output, parent reads it.
+    */
     int input_pipe[2];
     int output_pipe[2];
     
@@ -220,9 +285,14 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
     }
     
     // Create environment array
+    // -> to convert std::map of environment vars into a char*[] format for execve.
     char** env = createEnvArray();
     
-    // Fork process
+    /*
+    Two process now 
+    Child: runs the CGI script
+    Parent: waits and reads the outp
+    */
     pid_t pid = fork();
     if (pid == -1) {
         close(input_pipe[0]);
@@ -238,10 +308,34 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
     if (pid == 0) {
         // Child process
         
+        std::string final_script_path = normalized_script_path;
+        
         // Change to working directory if specified
         if (!working_directory.empty() && chdir(working_directory.c_str()) != 0) {
             exit(1);
         }
+        
+        // If we changed to a working directory, adjust the script path to be relative to that directory
+        if (!working_directory.empty()) {
+            // Remove the working directory part from the script path if it's there
+            if (final_script_path.find(working_directory + "/") == 0) {
+                final_script_path = final_script_path.substr(working_directory.length() + 1);
+            } else if (final_script_path.find("./cgi_bin/") == 0) {
+                final_script_path = final_script_path.substr(10); // Remove "./cgi_bin/"
+            }
+        }
+
+        /*
+        Before change:
+
+    working_directory = "/var/www/cgi_bin"
+    final_script_path = "/var/www/cgi_bin/test.py"
+
+    After change:
+    We remove "/var/www/cgi_bin/" from the front → final_script_path = "test.py"
+        */
+        
+        std::cout << "[DEBUG] CGI Child Process - Final script path after working dir adjustment: " << final_script_path << std::endl;
         
         // Redirect stdin and stdout
         dup2(input_pipe[0], STDIN_FILENO);
@@ -256,11 +350,14 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
         // Prepare arguments - script path as first argument as per webserv requirements
         char* args[3];
         args[0] = const_cast<char*>(executor.c_str());
-        args[1] = const_cast<char*>(script_path.c_str());
+        args[1] = const_cast<char*>(final_script_path.c_str());
         args[2] = NULL;
         
-        // Execute CGI script
+        std::cout << "[DEBUG] CGI Child Process - About to execute: " << executor << " " << final_script_path << std::endl;
+        
+        // all cgi done, parent can start to read the cgi for output
         execve(executor.c_str(), args, env);
+        
         exit(1);  // execve failed
     } else {
         // Parent process
@@ -288,6 +385,8 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
             output.append(buffer, bytes_read);
         }
         close(output_pipe[0]);
+
+        std::cout << "output =" << output << std:: endl;
         
         // Wait for child process to complete
         int status;
@@ -305,7 +404,8 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
         
         // Parse the output
         parseOutput(output, result);
-        
+        //std::cout << " Status : 200 OK" << output << std::endl;
+
         return result;
     }
 }

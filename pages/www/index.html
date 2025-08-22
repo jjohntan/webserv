@@ -6,5 +6,32 @@
 <body>
     <h1> Hello world</h1>
     <p>this is a test index page </p>
+    
+    <!-- CGI Form Examples -->
+    <h2>CGI Examples</h2>
+    
+    <!-- GET request to CGI -->
+    <h3>GET CGI Script</h3>
+    <form action="/cgi-bin/python/hello.php" method="GET">
+        <label for="name">Your Name:</label>
+        <input type="text" id="name" name="name" value="World">
+        <input type="submit" value="Say Hello (GET)">
+    </form>
+    
+    <!-- POST request to CGI -->
+    <h3>POST CGI Script</h3>
+    <form action="/cgi-bin/python/test.py" method="POST">
+        <label for="message">Message:</label>
+        <textarea id="message" name="message" rows="3" cols="40">Hello from POST!</textarea><br><br>
+        <input type="submit" value="Send Message (POST)">
+    </form>
+    
+    <!-- Direct links to CGI scripts -->
+    <h3>Direct CGI Links</h3>
+    <ul>
+        <li><a href="/cgi-bin/python/hello.py">Run Hello Script</a></li>
+        <li><a href="/cgi-bin/python/hello.py?name=42Student">Hello with parameter</a></li>
+        <li><a href="/cgi-bin/python/test.py">Run Test Script</a></li>
+    </ul>
 </body>
 </html>

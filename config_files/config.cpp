@@ -201,6 +201,13 @@ void ConfigParser::parseLocationDirective(const std::string& line, Location& loc
         }
         std::cout << "    Upload path: " << location.upload_path << std::endl;
     }
+    else if (directive == "root") {
+        iss >> location.root;
+        if (!location.root.empty() && location.root[location.root.length() - 1] == ';') {
+            location.root = location.root.substr(0, location.root.length() - 1);
+        }
+        std::cout << "    Location root: " << location.root << std::endl;
+    }
     else if (directive == "autoindex") {
         std::string value;
         iss >> value;
