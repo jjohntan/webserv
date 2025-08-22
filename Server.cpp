@@ -1,6 +1,15 @@
 #include "Server.hpp"
 
 #define PORT "8080"
+#include <csignal>
+
+volatile sig_atomic_t g_running = true;
+
+void signalHandler(int signum)
+{
+    (void)signum;
+    g_running = false;
+}
 
 void Server::removePfds(int i)
 {
@@ -72,6 +81,8 @@ void Server::addNewConnection()
 // Main loop
 void Server::run()
 {
+	std::signal(SIGINT, signalHandler);
+    std::signal(SIGTERM, signalHandler);
 	std::cout << "waiting for connections" << std::endl;
 	while (true)
 	{
@@ -97,6 +108,26 @@ void Server::run()
 			pfds[i].revents = 0;
 		}
 	}
+	  // Close all client connections
+    for (size_t i = 0; i < pfds.size(); i++)
+    {
+        if (pfds[i].fd >= 0)
+        {
+            close(pfds[i].fd);
+        }
+    }
+    
+    // Close server socket
+    if (socket_fd >= 0)
+    {
+        close(socket_fd);
+        socket_fd = -1;
+    }
+    
+    // Clear the pollfd vector
+    pfds.clear();
+    
+    std::cout << "Server shut down gracefully" << std::endl;
 }
 
 int Server::createListeningSocket()
