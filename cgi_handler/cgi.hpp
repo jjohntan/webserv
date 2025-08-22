@@ -12,16 +12,20 @@
 #include <sstream>
 #include <cctype>
 #include <cstring>
-#include "../http/HTTPRequest.hpp"
+#include "../http/HTTPRequest/HTTPRequest.hpp"
 
 // C++98 compatible string conversion
 std::string intToString(int value);
+
 
 struct CGIResult {
     std::string output;
     std::string headers;
     std::string body;
+    std::string content; //add ( body + header)
+    std::string status_message; //add
     int status_code;
+    int socketFD; //add
     bool success;
     
     CGIResult() : status_code(200), success(false) {}

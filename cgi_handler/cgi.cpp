@@ -9,7 +9,6 @@ std::string intToString(int value) {
 //constructor
 CGIHandler::CGIHandler() {}
 
-
 //destructor
 CGIHandler::~CGIHandler() {}
 
@@ -174,7 +173,6 @@ void CGIHandler::setupStandardCGIVars(const HTTPRequest& request, const std::str
     }
 }
 
-
 /*
 split into
 result.headers
@@ -190,26 +188,36 @@ void CGIHandler::parseOutput(const std::string& output, CGIResult& result) {
     
     result.output = output;  // full raw output
     
+    std::cout << "[DEBUG] CGI parseOutput - Raw output length: " << output.length() << std::endl;
+    //std::cout << "[DEBUG] CGI parseOutput - First 200 chars: " << output.substr(0, 200) << std::endl;
+    
     // Find the double CRLF that separates headers from body
     size_t header_end = output.find("\r\n\r\n");
+    size_t separator_length = 4; // "\r\n\r\n"
+    
     if (header_end == std::string::npos) {
         header_end = output.find("\n\n");
         if (header_end != std::string::npos) {
-            header_end += 2; // "\n\n" is 2 chars
+            separator_length = 2; // "\n\n"
         }
-    } else {
-        header_end += 4; // "\r\n\r\n" is 4 chars
     }
     
+    std::cout << "[DEBUG] CGI parseOutput - Header end position: " << header_end << std::endl;
+    std::cout << "[DEBUG] CGI parseOutput - Separator length: " << separator_length << std::endl;
+    
     if (header_end != std::string::npos) {
-        result.headers = output.substr(0, header_end - 4); // Exclude the double CRLF
-        if (header_end < output.length()) {
-            result.body = output.substr(header_end);
+        result.headers = output.substr(0, header_end); // Don't exclude the separator here
+        size_t body_start = header_end + separator_length;
+        if (body_start < output.length()) {
+            result.body = output.substr(body_start);
         }
+        std::cout << "[DEBUG] CGI parseOutput - Parsed headers: '" << result.headers << "'" << std::endl;
+        std::cout << "[DEBUG] CGI parseOutput - Body length: " << result.body.length() << std::endl;
     } else {
         // No headers found, treat entire output as body
         result.body = output;
         result.headers = "Content-Type: text/html";
+        std::cout << "[DEBUG] CGI parseOutput - No headers found, using default" << std::endl;
     }
     
     result.success = true;
@@ -325,17 +333,6 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
             }
         }
 
-        /*
-        Before change:
-
-    working_directory = "/var/www/cgi_bin"
-    final_script_path = "/var/www/cgi_bin/test.py"
-
-    After change:
-    We remove "/var/www/cgi_bin/" from the front → final_script_path = "test.py"
-        */
-        
-        std::cout << "[DEBUG] CGI Child Process - Final script path after working dir adjustment: " << final_script_path << std::endl;
         
         // Redirect stdin and stdout
         dup2(input_pipe[0], STDIN_FILENO);
@@ -352,8 +349,6 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
         args[0] = const_cast<char*>(executor.c_str());
         args[1] = const_cast<char*>(final_script_path.c_str());
         args[2] = NULL;
-        
-        std::cout << "[DEBUG] CGI Child Process - About to execute: " << executor << " " << final_script_path << std::endl;
         
         // all cgi done, parent can start to read the cgi for output
         execve(executor.c_str(), args, env);

@@ -5,7 +5,7 @@
 #include <map>
 #include <vector>
 #include "cgi_handler/cgi.hpp"
-#include "http/HTTPRequest.hpp"
+#include "http/HTTPRequest/HTTPRequest.hpp"
 #include "config_files/config.hpp"
 
 class Server {
@@ -22,11 +22,13 @@ private:
     bool endsWith(const std::string& str, const std::string& suffix);
     std::string getContentType(const std::string& path);
     std::string handleCGIRequest(const HTTPRequest& request, const Location& location, const std::string& file_path);
+    std::string handleDeleteRequest(const HTTPRequest& request, const Location& location);
     std::string processHTTPRequest(const HTTPRequest& request);
     const ServerConfig* findMatchingServer(const HTTPRequest& request);
     const Location* findMatchingLocation(const std::string& path, const std::vector<Location>& locations);
     std::string buildFilePath(const std::string& request_path, const Location& location);
     std::string serveStaticFile(const std::string& file_path);
+    std::string generateDirectoryListing(const std::string& dir_path);
     std::string intToString(int value);
     
 public:

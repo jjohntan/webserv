@@ -1,37 +1,74 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Welcome to 42 webserv</title>
+    <title>WebServ Test Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { color: #333; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .test-section h2 { margin-top: 0; }
+        a { color: #0066cc; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .code { background: #f5f5f5; padding: 10px; font-family: monospace; }
+    </style>
 </head>
 <body>
-    <h1> Hello world</h1>
-    <p>this is a test index page </p>
-    
-    <!-- CGI Form Examples -->
-    <h2>CGI Examples</h2>
-    
-    <!-- GET request to CGI -->
-    <h3>GET CGI Script</h3>
-    <form action="/cgi-bin/python/hello.php" method="GET">
-        <label for="name">Your Name:</label>
-        <input type="text" id="name" name="name" value="World">
-        <input type="submit" value="Say Hello (GET)">
-    </form>
-    
-    <!-- POST request to CGI -->
-    <h3>POST CGI Script</h3>
-    <form action="/cgi-bin/python/test.py" method="POST">
-        <label for="message">Message:</label>
-        <textarea id="message" name="message" rows="3" cols="40">Hello from POST!</textarea><br><br>
-        <input type="submit" value="Send Message (POST)">
-    </form>
-    
-    <!-- Direct links to CGI scripts -->
-    <h3>Direct CGI Links</h3>
-    <ul>
-        <li><a href="/cgi-bin/python/hello.py">Run Hello Script</a></li>
-        <li><a href="/cgi-bin/python/hello.py?name=42Student">Hello with parameter</a></li>
-        <li><a href="/cgi-bin/python/test.py">Run Test Script</a></li>
-    </ul>
+    <h1>WebServ Test Page</h1>
+    <p>This is a simple test page for the WebServ HTTP server.</p>
+
+    <div class="test-section">
+        <h2>1. CGI Test</h2>
+        <p>Test CGI functionality with Python scripts:</p>
+        <ul>
+            <li><a href="/cgi-bin/python/hello.py">Basic CGI Test</a> - Shows environment variables</li>
+            <li><a href="/cgi-bin/python/test.py">Simple CGI Test</a> - Basic CGI response</li>
+            <li><a href="/cgi-bin/python/hello.py?name=World">CGI with Parameters</a> - Test query string</li>
+        </ul>
+        <div class="code">
+            Expected: HTML page showing CGI environment variables and request info
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. File Upload Test</h2>
+        <p>Test file upload functionality:</p>
+        <ul>
+            <li><a href="/cgi-bin/python/upload.py">File Upload System</a> - Upload and manage files</li>
+            <li><a href="/upload/">Upload Directory</a> - Browse uploaded files</li>
+        </ul>
+        <div class="code">
+            Expected: File upload form, ability to upload files and see them listed
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Static File Test</h2>
+        <p>Test static file serving:</p>
+        <ul>
+            <li><a href="/upload/upload.html">Upload Info Page</a> - Static HTML file</li>
+        </ul>
+        <div class="code">
+            Expected: Static HTML page should load normally
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Error Page Test</h2>
+        <p>Test error handling:</p>
+        <ul>
+            <li><a href="/nonexistent.html">404 Error</a> - Page not found</li>
+        </ul>
+        <div class="code">
+            Expected: Custom 404 error page
+        </div>
+    </div>
+
+    <h2>Testing Steps:</h2>
+    <ol>
+        <li>Start the server: <code>./webserver testconfig/test.conf</code></li>
+        <li>Open browser to: <code>http://localhost:8080</code></li>
+        <li>Click on each test link above</li>
+        <li>Check that each feature works as expected</li>
+    </ol>
 </body>
 </html>
