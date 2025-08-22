@@ -15,9 +15,11 @@
 # include "HTTPRequest/HTTPRequest.hpp"
 # include "HTTPResponse/HTTPResponse.hpp"
 # include <map>
+# include <string>
 
 void	printRequest(const HTTPRequest &req);
+std::string	generateResponseBody(); // for hardcoded body
 void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::vector<struct pollfd>& fds, size_t &i);
-bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::string	data)
+bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::string	data);
 
 #endif
