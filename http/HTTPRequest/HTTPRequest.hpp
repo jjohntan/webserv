@@ -73,7 +73,7 @@ class	HTTPRequest
 		HTTPRequest(int socketFD);
 		~HTTPRequest();
 		HTTPRequest(const HTTPRequest &other);
-		const HTTPRequest	&operator=(const HTTPRequest &other);
+		HTTPRequest	&operator=(const HTTPRequest &other);
 
 		void	feed(std::string &data);
 

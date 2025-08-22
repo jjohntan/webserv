@@ -34,7 +34,7 @@ HTTPRequest::HTTPRequest(const HTTPRequest &other):
 	_method(other._method), _path(other._path), _version(other._version)
 {}
 
-const HTTPRequest &HTTPRequest::operator=(const HTTPRequest &other)
+HTTPRequest &HTTPRequest::operator=(const HTTPRequest &other)
 {
 	if (this != &other)
 	{
