@@ -236,7 +236,7 @@ void	HTTPResponse::addStatusLineToContent()
 
 /***************************** ERROR PAGES GENERATION ******************* */
 
-std::string HTTPResponse::generateErrorHTML(int code, const std::string &message) const
+std::string HTTPResponse::generateErrorHTML(int code, const std::string &message)
 {
 	std::ostringstream stream;
 	stream	<< "<!DOCTYPE html>\n"
@@ -246,7 +246,7 @@ std::string HTTPResponse::generateErrorHTML(int code, const std::string &message
 	return (stream.str());
 }
 
-std::string HTTPResponse::buildErrorResponse() const
+std::string HTTPResponse::buildErrorResponse()
 {
 	this->_content = generateErrorHTML(_statusCode, _statusMessage);
 

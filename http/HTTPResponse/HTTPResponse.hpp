@@ -52,8 +52,8 @@ class	HTTPResponse
 		void	addStatusLineToContent();
 
 		/* Simple Error Page Generation */
-		std::string HTTPResponse::generateErrorHTML(int code, const std::string &message) const;
-		std::string HTTPResponse::buildErrorResponse() const;
+		std::string generateErrorHTML(int code, const std::string &message);
+		std::string buildErrorResponse();
 
 		/* Utility */
 		void	trimBackslashR(std::string &line);
