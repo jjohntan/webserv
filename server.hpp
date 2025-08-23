@@ -6,6 +6,7 @@
 #include <vector>
 #include "cgi_handler/cgi.hpp"
 #include "http/HTTPRequest/HTTPRequest.hpp"
+#include "http/HTTPResponse/HTTPResponse.hpp"
 #include "config_files/config.hpp"
 
 class Server {
@@ -21,14 +22,14 @@ private:
     void sendErrorResponse(int client_fd, int error_code);
     bool endsWith(const std::string& str, const std::string& suffix);
     std::string getContentType(const std::string& path);
-    std::string handleCGIRequest(const HTTPRequest& request, const Location& location, const std::string& file_path);
-    std::string handleDeleteRequest(const HTTPRequest& request, const Location& location);
-    std::string processHTTPRequest(const HTTPRequest& request);
+    HTTPResponse handleCGIRequest(const HTTPRequest& request, const Location& location, const std::string& file_path, int client_fd);
+    HTTPResponse handleDeleteRequest(const HTTPRequest& request, const Location& location, int client_fd);
+    HTTPResponse processHTTPRequest(const HTTPRequest& request, int client_fd);
     const ServerConfig* findMatchingServer(const HTTPRequest& request);
     const Location* findMatchingLocation(const std::string& path, const std::vector<Location>& locations);
     std::string buildFilePath(const std::string& request_path, const Location& location);
-    std::string serveStaticFile(const std::string& file_path);
-    std::string generateDirectoryListing(const std::string& dir_path);
+    HTTPResponse serveStaticFile(const std::string& file_path, int client_fd);
+    HTTPResponse generateDirectoryListing(const std::string& dir_path, int client_fd);
     std::string intToString(int value);
     
 public:

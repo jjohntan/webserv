@@ -173,6 +173,66 @@ void CGIHandler::setupStandardCGIVars(const HTTPRequest& request, const std::str
     }
 }
 
+// Helper method to extract status code from CGI headers
+int CGIHandler::extractStatusFromHeaders(const std::string& headers) {
+    std::istringstream header_stream(headers);
+    std::string line;
+    
+    while (std::getline(header_stream, line)) {
+        // Remove carriage return if present
+        if (!line.empty() && line[line.length() - 1] == '\r') {
+            line.erase(line.length() - 1);
+        }
+        
+        // Look for Status header (case-insensitive)
+        if (line.length() >= 7) {
+            std::string prefix = line.substr(0, 7);
+            // Convert to lowercase manually for C++98 compatibility
+            for (size_t i = 0; i < prefix.length(); ++i) {
+                prefix[i] = std::tolower(prefix[i]);
+            }
+            
+            if (prefix == "status:") {
+                std::string status_part = line.substr(7);
+                // Trim leading spaces
+                size_t start = status_part.find_first_not_of(" \t");
+                if (start != std::string::npos) {
+                    status_part = status_part.substr(start);
+                    // Extract just the numeric part
+                    std::istringstream status_stream(status_part);
+                    int status_code;
+                    if (status_stream >> status_code) {
+                        return status_code;
+                    }
+                }
+            }
+        }
+    }
+    return 200; // Default to 200 if no Status header found
+}
+
+// Helper method to generate status message from status code
+std::string CGIHandler::getStatusMessage(int status_code) {
+    switch (status_code) {
+        case 200: return "OK";
+        case 201: return "Created";
+        case 204: return "No Content";
+        case 301: return "Moved Permanently";
+        case 302: return "Found";
+        case 304: return "Not Modified";
+        case 400: return "Bad Request";
+        case 401: return "Unauthorized";
+        case 403: return "Forbidden";
+        case 404: return "Not Found";
+        case 405: return "Method Not Allowed";
+        case 500: return "Internal Server Error";
+        case 501: return "Not Implemented";
+        case 502: return "Bad Gateway";
+        case 503: return "Service Unavailable";
+        default: return "Unknown";
+    }
+}
+
 /*
 split into
 result.headers
@@ -183,13 +243,16 @@ void CGIHandler::parseOutput(const std::string& output, CGIResult& result) {
     if (output.empty()) {
         result.success = false;
         result.status_code = 500;
+        result.status_message = getStatusMessage(500);
+        result.headers = "Content-Type: text/html";
+        result.body = "<html><body><h1>500 Internal Server Error</h1><p>CGI script produced no output.</p></body></html>";
+        result.content = result.headers + "\r\n\r\n" + result.body;
         return;
     }
     
     result.output = output;  // full raw output
     
     std::cout << "[DEBUG] CGI parseOutput - Raw output length: " << output.length() << std::endl;
-    //std::cout << "[DEBUG] CGI parseOutput - First 200 chars: " << output.substr(0, 200) << std::endl;
     
     // Find the double CRLF that separates headers from body
     size_t header_end = output.find("\r\n\r\n");
@@ -206,7 +269,7 @@ void CGIHandler::parseOutput(const std::string& output, CGIResult& result) {
     std::cout << "[DEBUG] CGI parseOutput - Separator length: " << separator_length << std::endl;
     
     if (header_end != std::string::npos) {
-        result.headers = output.substr(0, header_end); // Don't exclude the separator here
+        result.headers = output.substr(0, header_end);
         size_t body_start = header_end + separator_length;
         if (body_start < output.length()) {
             result.body = output.substr(body_start);
@@ -220,8 +283,22 @@ void CGIHandler::parseOutput(const std::string& output, CGIResult& result) {
         std::cout << "[DEBUG] CGI parseOutput - No headers found, using default" << std::endl;
     }
     
+    // Extract status code from headers (look for Status: header)
+    result.status_code = extractStatusFromHeaders(result.headers);
+    
+    // Generate status message based on status code
+    result.status_message = getStatusMessage(result.status_code);
+    
+    // Create content (headers + body)
+    result.content = result.headers + "\r\n\r\n" + result.body;
+    
     result.success = true;
-    result.status_code = 200;
+
+    std::cout << "[DEBUG] CGI executeCGI - Socket FD: " << result.socketFD << std::endl;
+    std::cout << "[DEBUG] CGI parseOutput - Status code: " << result.status_code << std::endl;
+    std::cout << "[DEBUG] CGI parseOutput - Status message: " << result.status_message << std::endl;
+    std::cout << "[DEBUG] CGI parseOutput - Content length: " << result.content.length() << std::endl;
+    std::cout << "[DEBUG] CGI parseOutput - Content : " << result.content << std::endl;
 }
 
 CGIResult CGIHandler::executeCGI(const HTTPRequest& request, 
@@ -230,9 +307,12 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
                                 const std::string& working_directory) {
     CGIResult result;
     
+    // Set the socket FD from the request
+    result.socketFD = request.getSocketFD();
+    
     std::cout << "[DEBUG] CGI executeCGI - Original script_path: " << script_path << std::endl;
     std::cout << "[DEBUG] CGI executeCGI - Working directory: " << working_directory << std::endl;
-    
+     
     /*
     clean up the path to remove things like:
             Double slashes (//)
@@ -246,6 +326,10 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
     if (!isCGIScript(normalized_script_path, cgi_extensions)) {
         result.success = false;
         result.status_code = 404;
+        result.status_message = getStatusMessage(404);
+        result.headers = "Content-Type: text/html";
+        result.body = "<html><body><h1>404 Not Found</h1><p>The requested CGI script was not found.</p></body></html>";
+        result.content = result.headers + "\r\n\r\n" + result.body;
         return result;
     }
     
@@ -258,6 +342,10 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
     if (executor.empty()) {
         result.success = false;
         result.status_code = 500;
+        result.status_message = getStatusMessage(500);
+        result.headers = "Content-Type: text/html";
+        result.body = "<html><body><h1>500 Internal Server Error</h1><p>No executor found for CGI script.</p></body></html>";
+        result.content = result.headers + "\r\n\r\n" + result.body;
         return result;
     }
     
@@ -289,6 +377,10 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
     if (pipe(input_pipe) == -1 || pipe(output_pipe) == -1) {
         result.success = false;
         result.status_code = 500;
+        result.status_message = getStatusMessage(500);
+        result.headers = "Content-Type: text/html";
+        result.body = "<html><body><h1>500 Internal Server Error</h1><p>Failed to create pipes for CGI execution.</p></body></html>";
+        result.content = result.headers + "\r\n\r\n" + result.body;
         return result;
     }
     
@@ -310,6 +402,10 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
         freeEnvArray(env);
         result.success = false;
         result.status_code = 500;
+        result.status_message = getStatusMessage(500);
+        result.headers = "Content-Type: text/html";
+        result.body = "<html><body><h1>500 Internal Server Error</h1><p>Failed to fork process for CGI execution.</p></body></html>";
+        result.content = result.headers + "\r\n\r\n" + result.body;
         return result;
     }
     
@@ -381,7 +477,7 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
         }
         close(output_pipe[0]);
 
-        std::cout << "output =" << output << std:: endl;
+        std::cout << "output =" << output << std::endl;
         
         // Wait for child process to complete
         int status;
@@ -394,12 +490,15 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
         if (WEXITSTATUS(status) != 0) {
             result.success = false;
             result.status_code = 500;
+            result.status_message = getStatusMessage(500);
+            result.headers = "Content-Type: text/html";
+            result.body = "<html><body><h1>500 Internal Server Error</h1><p>CGI script execution failed.</p></body></html>";
+            result.content = result.headers + "\r\n\r\n" + result.body;
             return result;
         }
         
         // Parse the output
         parseOutput(output, result);
-        //std::cout << " Status : 200 OK" << output << std::endl;
 
         return result;
     }

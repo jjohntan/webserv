@@ -48,6 +48,8 @@ private:
     void freeEnvArray(char** env);
     std::string toUpperCase(const std::string& str);
     std::string normalizePath(const std::string& path);
+    int extractStatusFromHeaders(const std::string& headers);
+    std::string getStatusMessage(int status_code);
     
 public:
     CGIHandler();
