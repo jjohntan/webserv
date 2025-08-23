@@ -253,7 +253,7 @@ std::string HTTPResponse::buildErrorResponse() const
 	std::ostringstream stream;
 	stream	<< this->_formatedStatus
 			<< "Content-Type: text/html\r\n"
-			<< "Content-Length: " << body.size() << "\r\n"
+			<< "Content-Length: " << _content.size() << "\r\n"
 			<< "Connection: close\r\n"
 			<< "\r\n"
 			<< this->_content;
