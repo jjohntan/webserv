@@ -34,7 +34,7 @@ HTTPRequest::HTTPRequest(const HTTPRequest &other):
 	_method(other._method), _path(other._path), _version(other._version)
 {}
 
-const HTTPRequest &HTTPRequest::operator=(const HTTPRequest &other)
+HTTPRequest &HTTPRequest::operator=(const HTTPRequest &other)
 {
 	if (this != &other)
 	{
@@ -119,6 +119,11 @@ const std::string &HTTPRequest::getVersion() const
 	return (this->_version);
 }
 
+const int &HTTPRequest::getSocketFD() const
+{
+	return (this->_socketFD);
+}
+
 /* Setters */
 void	HTTPRequest::setRawString(std::string &rawString)
 {
@@ -158,6 +163,11 @@ void HTTPRequest::setPath(const std::string &path)
 void HTTPRequest::setVersion(const std::string &version)
 {
 	this->_version = version;
+}
+
+void HTTPRequest::setSocketFD(const int &socketFD)
+{
+	this->_socketFD = socketFD;
 }
 
 /****************************** READING ***************************************** */

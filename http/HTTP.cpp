@@ -25,6 +25,38 @@ void printRequest(const HTTPRequest &req)
 	std::cout << req.getRawBody() << std::endl;
 }
 
+std::string generateHttpResponseBody()
+{
+	return
+		"Date: Fri, 22 Aug 2025 08:00:00 GMT\r\n"
+		"Server: Webserv/0.1 C++98\r\n"
+		"Content-Type: text/html; charset=utf-8\r\n"
+		"Content-Length: 1088\r\n"
+		"Connection: close\r\n"
+		"\r\n"
+		"<!doctype html>\n"
+		"<html lang=\"en\">\n"
+		"<head>\n"
+		"<meta charset=\"utf-8\">\n"
+		"<title>It works!</title>\n"
+		"<style>\n"
+		"  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:linear-gradient(135deg,#1e3a8a,#9333ea,#ef4444,#f59e0b,#10b981);background-size:400% 400%;animation:grad 15s ease infinite;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;}\n"
+		"  .card{background:rgba(255,255,255,0.12);padding:2rem 3rem;border-radius:16px;backdrop-filter:blur(6px);box-shadow:0 10px 30px rgba(0,0,0,0.25);text-align:center;}\n"
+		"  h1{margin:0 0 0.5rem;font-size:2.2rem;text-shadow:0 2px 8px rgba(0,0,0,0.35)}\n"
+		"  p{margin:0.25rem 0 0;font-size:1.1rem}\n"
+		"  .rainbow{background:linear-gradient(90deg,#f87171,#fbbf24,#34d399,#60a5fa,#a78bfa,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent;}\n"
+		"  @keyframes grad{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}\n"
+		"</style>\n"
+		"</head>\n"
+		"<body>\n"
+		"  <div class=\"card\">\n"
+		"    <h1 class=\"rainbow\">200 OK</h1>\n"
+		"    <p>Hello from your tiny C++ web server.</p>\n"
+		"  </div>\n"
+		"</body>\n"
+		"</html>\n";
+}
+
 void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::vector<struct pollfd>& fds, size_t &i)
 {
 	char	buffer[READ_BYTES] = {0};
@@ -74,9 +106,10 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 			// From Winnie
 			// cgiOutput	cgiOutput;
 			// output = runcgi(requestMap[socketFD]);
+			// HTTPResponse	response(output.status_message, output.status_code, output.content, socketFD);
 
-			HTTPResponse	response(cgiOutput.getStatusLine(),cgiOutput.getContent(), socketFD);
-			response.processHTTPResponse();
+			// Hardcoded for body
+			HTTPResponse response("OK", 200, generateHttpResponseBody(), socketFD);
 
 			// Sending response back to corresponding socket
 			std::cout << "Sending Response Back to Socket\n";

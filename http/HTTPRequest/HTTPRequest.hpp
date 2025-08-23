@@ -73,7 +73,7 @@ class	HTTPRequest
 		HTTPRequest(int socketFD);
 		~HTTPRequest();
 		HTTPRequest(const HTTPRequest &other);
-		const HTTPRequest	&operator=(const HTTPRequest &other);
+		HTTPRequest	&operator=(const HTTPRequest &other);
 
 		void	feed(std::string &data);
 
@@ -89,6 +89,7 @@ class	HTTPRequest
 		const std::string &getMethod() const;
 		const std::string &getPath() const;
 		const std::string &getVersion() const;
+		const int &getSocketFD() const
 
 		/* Setters */
 		void setRawString(std::string &rawString);
@@ -99,6 +100,7 @@ class	HTTPRequest
 		void setMethod(const std::string &method);
 		void setPath(const std::string &path);
 		void setVersion(const std::string &version);
+		void setSocketFD(const int &socketFD);
 
 		class EmptyRawString : public std::exception
 		{

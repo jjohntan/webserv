@@ -33,13 +33,14 @@ class	HTTPResponse
 		HTTPResponse();
 	public:
 		HTTPResponse(std::string statusLine, std::string content, int socketFD); // normal response
+		HTTPResponse( std::string statusMessage, int statusCode, std::string content, int socketFD);
 		HTTPResponse(std::string status, int errorCode); // default content error
 		HTTPResponse(std::string status, int errorCode, std::string	content);
 		~HTTPResponse();
 		HTTPResponse(const HTTPResponse &other);
-		const HTTPResponse	&operator=(const HTTPResponse &other);
+		HTTPResponse	&operator=(const HTTPResponse &other);
 
-		void	processHTTPResponse();
+		// void	processHTTPResponse();
 		void	sendResponse() const;
 		
 		/* Status Line */
