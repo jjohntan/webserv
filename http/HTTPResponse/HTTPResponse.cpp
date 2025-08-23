@@ -37,7 +37,7 @@ HTTPResponse::HTTPResponse(std::string status, int errorCode):
 	std::string	errorCodeStr = stream.str();
 	this->_modifyStatus = errorCodeStr + " " + status + "\r\n";
 	this->reformatStatusLine();
-	this->buildErrorResponse();
+	this->_content = this->buildErrorResponse();
 	this->addStatusLineToContent();
 }
 
@@ -248,15 +248,15 @@ std::string HTTPResponse::generateErrorHTML(int code, const std::string &message
 
 std::string HTTPResponse::buildErrorResponse()
 {
-	this->_content = generateErrorHTML(_statusCode, _statusMessage);
+	this->_body = generateErrorHTML(_statusCode, _statusMessage);
 
 	std::ostringstream stream;
 	stream	<< this->_formatedStatus
 			<< "Content-Type: text/html\r\n"
-			<< "Content-Length: " << _content.size() << "\r\n"
+			<< "Content-Length: " << _body.size() << "\r\n"
 			<< "Connection: close\r\n"
 			<< "\r\n"
-			<< this->_content;
+			<< this->_body;
 
 	return (stream.str());
 }

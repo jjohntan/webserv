@@ -28,6 +28,7 @@ class	HTTPResponse
 		std::string	_completeRawResponse;
 
 		std::string	_content; // body & header
+		std::string	_body; // body only
 		int	_socketFD;
 
 		HTTPResponse();
