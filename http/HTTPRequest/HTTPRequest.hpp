@@ -89,7 +89,7 @@ class	HTTPRequest
 		const std::string &getMethod() const;
 		const std::string &getPath() const;
 		const std::string &getVersion() const;
-		const int &getSocketFD() const
+		const int &getSocketFD() const;
 
 		/* Setters */
 		void setRawString(std::string &rawString);
