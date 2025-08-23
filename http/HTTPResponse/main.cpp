@@ -12,9 +12,6 @@ int main()
 	// Construct HTTPResponse object
 	HTTPResponse response(statusLine, body, fakeSocketFD);
 
-	// Process the response (status parsing and formatting)
-	response.processHTTPResponse();
-
 	// Output verification
 	std::cout << CYAN << "=== HTTPResponse Internal State ===" << RESET << std::endl;
 	std::cout << YELLOW << "Status Line:        " << RESET << response.getStatusLine();
