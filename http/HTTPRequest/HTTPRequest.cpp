@@ -197,7 +197,7 @@ void	HTTPRequest::feed(std::string &data)
 			this->processUnchunked();
 	}
 }
- 
+
 /************************************ REQUEST LINE ******************************* */
 void	HTTPRequest::extractRequestLine()
 {
