@@ -16,6 +16,7 @@
 # include "HTTPResponse/HTTPResponse.hpp"
 # include <map>
 # include <string>
+# include <poll.h> 
 
 void	printRequest(const HTTPRequest &req);
 std::string	generateResponseBody(); // for hardcoded body

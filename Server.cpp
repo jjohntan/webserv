@@ -16,37 +16,37 @@ void Server::addPfds(int client_fd)
 	pfds.push_back(pfd);
 }
 
-void	Server::readClientData(std::map<int, HTTPRequest>& requestMap, size_t &i)
-{
-	char	buffer[READ_BYTES] = {0};
-	ssize_t	read_bytes = recv(socket_fd, buffer, READ_BYTES, 0);
+// void	Server::readClientData(std::map<int, HTTPRequest>& requestMap, size_t &i)
+// {
+// 	char	buffer[READ_BYTES] = {0};
+// 	ssize_t	read_bytes = recv(socket_fd, buffer, READ_BYTES, 0);
 
-	if (read_bytes <= 0)
-	{
-		if (read_bytes == 0)
-			std::cout << "Socket FD " << socket_fd << " disconnected\n";
-		else
-			perror("recv");
-		// Remove client socket from poll set and the map
-		close(socket_fd);
-		requestMap.erase(socket_fd);
-		pfds.erase(pfds.begin() + i);
-		--i; // Decrement to not skip element after erase
-		return ;
-	}
-	std::string	data(buffer, read_bytes);
-	bool	isClearing = false;
-	isClearing = processClientData(socket_fd, requestMap, data);
-	if (isClearing == true)
-	{
-		// Remove client socket from poll set and the map
-		close(socket_fd);
-		requestMap.erase(socket_fd);
-		pfds.erase(pfds.begin() + i);
-		--i; // Decrement to not skip element after erase
-	}
+// 	if (read_bytes <= 0)
+// 	{
+// 		if (read_bytes == 0)
+// 			std::cout << "Socket FD " << socket_fd << " disconnected\n";
+// 		else
+// 			perror("recv");
+// 		// Remove client socket from poll set and the map
+// 		close(socket_fd);
+// 		requestMap.erase(socket_fd);
+// 		pfds.erase(pfds.begin() + i);
+// 		--i; // Decrement to not skip element after erase
+// 		return ;
+// 	}
+// 	std::string	data(buffer, read_bytes);
+// 	bool	isClearing = false;
+// 	isClearing = processClientData(socket_fd, requestMap, data);
+// 	if (isClearing == true)
+// 	{
+// 		// Remove client socket from poll set and the map
+// 		close(socket_fd);
+// 		requestMap.erase(socket_fd);
+// 		pfds.erase(pfds.begin() + i);
+// 		--i; // Decrement to not skip element after erase
+// 	}
 	
-}
+// }
 
 // void Server::readClientData(int i)
 // {
@@ -93,7 +93,7 @@ void	Server::readClientData(std::map<int, HTTPRequest>& requestMap, size_t &i)
 // 	}
 // }
 
-void Server::addNewConnection(int listen_fd)
+void Server::addNewConnection(int listen_fd, std::map<int, HTTPRequest> &requestMap)
 {
 	struct sockaddr_storage client_addr;
 	socklen_t addr_len = sizeof(client_addr);
@@ -106,6 +106,7 @@ void Server::addNewConnection(int listen_fd)
 	else
 	{
 		addPfds(client_fd);
+		requestMap[client_fd] = HTTPRequest(client_fd); // create new HTTPRequest if haven't
 	}
 }
 
@@ -120,7 +121,9 @@ bool Server::isListeningSocket(int fd) {
 
 void Server::run()
 {
-    std::cout << "waiting for connections" << std::endl;
+    std::map<int, HTTPRequest> request_map;
+
+	std::cout << "waiting for connections" << std::endl;
     while (true)
     {
         int ready_fd = poll(pfds.data(), pfds.size(), -1);
@@ -133,11 +136,11 @@ void Server::run()
             if (pfds[i].revents & (POLLIN | POLLHUP)) {
                 if (isListeningSocket(pfds[i].fd))
 				{
-                    addNewConnection(pfds[i].fd);
+                    addNewConnection(pfds[i].fd, request_map);
                 }
 				else
 				{
-                    readClientData(g_requestMap, i);
+                    readClientData(pfds[i].fd, request_map, pfds, i);
                 }
             }
             pfds[i].revents = 0;

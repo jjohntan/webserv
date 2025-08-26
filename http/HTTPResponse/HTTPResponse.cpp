@@ -251,8 +251,7 @@ std::string HTTPResponse::buildErrorResponse()
 	this->_body = generateErrorHTML(_statusCode, _statusMessage);
 
 	std::ostringstream stream;
-	stream	<< this->_formatedStatus
-			<< "Content-Type: text/html\r\n"
+	stream	<< "Content-Type: text/html\r\n"
 			<< "Content-Length: " << _body.size() << "\r\n"
 			<< "Connection: close\r\n"
 			<< "\r\n"
