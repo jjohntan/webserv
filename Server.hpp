@@ -13,6 +13,8 @@
 #include <poll.h>
 #include <iostream>
 #include <set>
+#include "http/HTTP.hpp"
+#include "http/HTTPRequest/HTTPRequest.hpp"
 
 
 class Server
@@ -27,7 +29,8 @@ class Server
 	std::string root;
 		// helper
 		void addNewConnection(int listen_fd);
-		void readClientData(int i);
+		// void readClientData(int i);
+		void	readClientData(std::map<int, HTTPRequest>& requestMap, size_t &i);
 		void addPfds(int client_fd);
 		void removePfds(int i);
 		bool isListeningSocket(int fd);

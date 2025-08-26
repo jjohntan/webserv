@@ -12,7 +12,7 @@
 #include <sstream>
 #include <cctype>
 #include <cstring>
-#include "../http/HTTPRequest.hpp"
+#include "../http/HTTPRequest/HTTPRequest.hpp"
 
 // C++98 compatible string conversion
 std::string intToString(int value);

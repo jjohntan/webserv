@@ -1,45 +1,59 @@
-CXX = g++
-CXXFLAGS = -std=c++98 -Wall -Wextra -Werror 
+#------Colours------#
+DEF_COLOR='\033[0;39m'
+RESET = '\033[0;0m'
+BLACK='\033[0;30m'
+RED='\033[1;91m'
+GREEN='\033[1;92m'
+YELLOW='\033[0;93m'
+BLUE='\033[0;94m'
+MAGENTA='\033[0;95m'
+CYAN='\033[0;96m'
+GRAY='\033[0;90m'
+WHITE='\033[0;97m'
+PINK  = '\033[35m'
 
-WEBSERVER = webserver
+# Program Name
+NAME = Webserv
 
-# files
-SOURCES = Server.cpp config_files/config.cpp main.cpp cgi_handler/cgi.cpp http/HTTPRequest.cpp
-OBJECTS = Server.o config.o main.o cgi.o HTTPRequest.o
-HEADERS = Server.hpp config_files/config.hpp cgi_handler/cgi.hpp http/HTTPRequest.hpp
+# Compiler
+CC = c++
+CFLAGS = -Wall -Wextra -Werror -std=c++98 -g3 $(FSAN)
+FSAN = -fsanitize=address
+RM = rm -f
 
-all: $(WEBSERVER)
+# Source and Object
+SRCS =	main.cpp \
+		Server.cpp \
+		http/HTTPRequest/HTTPRequest.cpp \
+		http/HTTPResponse/HTTPResponse.cpp \
+		http/HTTP.cpp \
+		config_files/config.cpp \
+		cgi_handler/cgi.cpp
 
+OBJ = $(SRCS:.cpp=.o)
 
-$(WEBSERVER): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) -o $(WEBSERVER) $(OBJECTS)
-	@echo "Web server build complete! Executable: $(WEBSERVER)"
+# Rules
+all: $(NAME)
 
-server.o: Server.cpp Server.hpp cgi_handler/cgi.hpp http/HTTPRequest.hpp config_files/config.hpp
-	$(CXX) $(CXXFLAGS) -c Server.cpp -o server.o
+$(NAME): $(OBJ)
+	@ echo $(GREEN)" 🍕 Compiling "$(RED)"[$(NAME)]"$(GREEN)"..."$(RESET)
+	@ $(CC) $(CFLAGS) $(OBJ) -o $(NAME)
+	@ echo $(RED)" 🍟 [$(NAME)]"$(GREEN)" successfully compiled!"$(RESET)
+	@ echo $(GREEN)" 🌭 Your"$(RED)" [$(NAME)] "$(GREEN)"is ready to use"$(RESET)
 
-config.o: config_files/config.cpp config_files/config.hpp
-	$(CXX) $(CXXFLAGS) -c config_files/config.cpp -o config.o
-
-main.o: main.cpp Server.hpp config_files/config.hpp
-	$(CXX) $(CXXFLAGS) -c main.cpp -o main.o
-
-cgi.o: cgi_handler/cgi.cpp cgi_handler/cgi.hpp http/HTTPRequest.hpp
-	$(CXX) $(CXXFLAGS) -c cgi_handler/cgi.cpp -o cgi.o
-
-HTTPRequest.o: http/HTTPRequest.cpp http/HTTPRequest.hpp
-	$(CXX) $(CXXFLAGS) -c http/HTTPRequest.cpp -o HTTPRequest.o
+# $@ = target file
+# $< = first dependency
+# $^ = all dependencies
+%.o: %.cpp
+	@ $(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJECTS)
-	@echo "Cleaned object files"
+	@ echo $(CYAN)" 🥨 Cleaning Object Files..."$(RESET)
+	@ $(RM) $(OBJ)
 
 fclean: clean
-	rm -f $(WEBSERVER)
-	@echo "Full clean complete - removed all compiled files"
+	@ echo $(MAGENTA)" 🥯 Removing "$(RED)"[$(NAME)]"$(GREEN)"..."$(RESET)
+	@ $(RM) $(NAME)
+# $(RM) KL_shrubbery
 
-re: fclean all
-	@echo "Re-compilation complete!"
-
-
-.PHONY: all clean fclean re
+re : fclean all

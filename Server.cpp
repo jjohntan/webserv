@@ -1,5 +1,7 @@
 #include "Server.hpp"
 
+std::map<int, HTTPRequest> g_requestMap;
+
 void Server::removePfds(int i)
 {
 	pfds.erase(pfds.begin() + i);
@@ -14,50 +16,82 @@ void Server::addPfds(int client_fd)
 	pfds.push_back(pfd);
 }
 
-void Server::readClientData(int i)
+void	Server::readClientData(std::map<int, HTTPRequest>& requestMap, size_t &i)
 {
-	char buf[1024];
-	int sender_fd = pfds[i].fd;
-	int bytes_received = recv(sender_fd, buf, sizeof(buf), 0);// receive incoming data from a connected client
-	if (bytes_received > 0)
-		buf[bytes_received] = '\0';
-	
-	if (bytes_received <= 0)
-	{
-		if (bytes_received == 0)
-		{
-			printf("server: socket %d closed\n", sender_fd);
-		}
-		else
-		{
-			perror("recv");
-		}
-		close(sender_fd);
-		removePfds(i);
-	}
-	else
-	{
-		printf("server: recv from fd %d: %s\n", sender_fd, buf);
+	char	buffer[READ_BYTES] = {0};
+	ssize_t	read_bytes = recv(socket_fd, buffer, READ_BYTES, 0);
 
-		for (unsigned int j = 0; j < pfds.size(); j++)
-		{
-			int dest_fd = pfds[j].fd;
-			if (dest_fd != socket_fd && dest_fd != sender_fd)
-			{
-				const char *response = "HTTP/1.1 200 OK\r\n"
-                       "Content-Length: 13\r\n"
-                       "Content-Type: text/plain\r\n"
-                       "\r\n"
-                       "Hello, world!";
-				send(sender_fd, response, strlen(response), 0);// hardcode
-				// if (send(dest_fd, buf, bytes_received, 0) == -1)
-				// {
-				// 	perror("send");
-				// }
-			}
-		}
+	if (read_bytes <= 0)
+	{
+		if (read_bytes == 0)
+			std::cout << "Socket FD " << socket_fd << " disconnected\n";
+		else
+			perror("recv");
+		// Remove client socket from poll set and the map
+		close(socket_fd);
+		requestMap.erase(socket_fd);
+		pfds.erase(pfds.begin() + i);
+		--i; // Decrement to not skip element after erase
+		return ;
 	}
+	std::string	data(buffer, read_bytes);
+	bool	isClearing = false;
+	isClearing = processClientData(socket_fd, requestMap, data);
+	if (isClearing == true)
+	{
+		// Remove client socket from poll set and the map
+		close(socket_fd);
+		requestMap.erase(socket_fd);
+		pfds.erase(pfds.begin() + i);
+		--i; // Decrement to not skip element after erase
+	}
+	
 }
+
+// void Server::readClientData(int i)
+// {
+// 	char buf[1024];
+// 	int sender_fd = pfds[i].fd;
+// 	int bytes_received = recv(sender_fd, buf, sizeof(buf), 0);// receive incoming data from a connected client
+// 	if (bytes_received > 0)
+// 		buf[bytes_received] = '\0';
+	
+// 	if (bytes_received <= 0)
+// 	{
+// 		if (bytes_received == 0)
+// 		{
+// 			printf("server: socket %d closed\n", sender_fd);
+// 		}
+// 		else
+// 		{
+// 			perror("recv");
+// 		}
+// 		close(sender_fd);
+// 		removePfds(i);
+// 	}
+// 	else
+// 	{
+// 		printf("server: recv from fd %d: %s\n", sender_fd, buf);
+
+// 		for (unsigned int j = 0; j < pfds.size(); j++)
+// 		{
+// 			int dest_fd = pfds[j].fd;
+// 			if (dest_fd != socket_fd && dest_fd != sender_fd)
+// 			{
+// 				const char *response = "HTTP/1.1 200 OK\r\n"
+//                        "Content-Length: 13\r\n"
+//                        "Content-Type: text/plain\r\n"
+//                        "\r\n"
+//                        "Hello, world!";
+// 				send(sender_fd, response, strlen(response), 0);// hardcode
+// 				// if (send(dest_fd, buf, bytes_received, 0) == -1)
+// 				// {
+// 				// 	perror("send");
+// 				// }
+// 			}
+// 		}
+// 	}
+// }
 
 void Server::addNewConnection(int listen_fd)
 {
@@ -103,7 +137,7 @@ void Server::run()
                 }
 				else
 				{
-                    readClientData(i);
+                    readClientData(g_requestMap, i);
                 }
             }
             pfds[i].revents = 0;
