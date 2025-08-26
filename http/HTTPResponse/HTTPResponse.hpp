@@ -28,18 +28,20 @@ class	HTTPResponse
 		std::string	_completeRawResponse;
 
 		std::string	_content; // body & header
+		std::string	_body; // body only
 		int	_socketFD;
 
 		HTTPResponse();
 	public:
 		HTTPResponse(std::string statusLine, std::string content, int socketFD); // normal response
+		HTTPResponse( std::string statusMessage, int statusCode, std::string content, int socketFD);
 		HTTPResponse(std::string status, int errorCode); // default content error
 		HTTPResponse(std::string status, int errorCode, std::string	content);
 		~HTTPResponse();
 		HTTPResponse(const HTTPResponse &other);
-		const HTTPResponse	&operator=(const HTTPResponse &other);
+		HTTPResponse	&operator=(const HTTPResponse &other);
 
-		void	processHTTPResponse();
+		// void	processHTTPResponse();
 		void	sendResponse() const;
 		
 		/* Status Line */
@@ -51,8 +53,8 @@ class	HTTPResponse
 		void	addStatusLineToContent();
 
 		/* Simple Error Page Generation */
-		std::string HTTPResponse::generateErrorHTML(int code, const std::string &message) const;
-		std::string HTTPResponse::buildErrorResponse() const;
+		std::string generateErrorHTML(int code, const std::string &message);
+		std::string buildErrorResponse();
 
 		/* Utility */
 		void	trimBackslashR(std::string &line);

@@ -7,7 +7,25 @@ HTTPResponse::HTTPResponse(std::string statusLine, std::string content, int sock
 	_statusCode(0),
 	_content(content),
 	_socketFD(socketFD)
-{}
+{
+	this->convertStatusLine();
+	this->reformatStatusLine();
+	this->addStatusLineToContent();
+}
+
+HTTPResponse::HTTPResponse(std::string statusMessage, int statusCode, std::string content, int socketFD):
+	_statusCode(statusCode),
+	_statusMessage(statusMessage),
+	_content(content),
+	_socketFD(socketFD)
+{
+	std::ostringstream	stream;
+	stream << statusCode;
+	std::string	codeStr = stream.str();
+	this->_modifyStatus = codeStr + " " + statusMessage + "\r\n";
+	this->reformatStatusLine();
+	this->addStatusLineToContent();
+}
 
 /* For Error Page Generation - Default Body*/
 HTTPResponse::HTTPResponse(std::string status, int errorCode):
@@ -19,7 +37,7 @@ HTTPResponse::HTTPResponse(std::string status, int errorCode):
 	std::string	errorCodeStr = stream.str();
 	this->_modifyStatus = errorCodeStr + " " + status + "\r\n";
 	this->reformatStatusLine();
-	this->buildErrorResponse();
+	this->_content = this->buildErrorResponse();
 	this->addStatusLineToContent();
 }
 
@@ -28,7 +46,7 @@ HTTPResponse::HTTPResponse(std::string status, int errorCode, std::string conten
 	_statusCode(errorCode),
 	_statusMessage(status)
 {
-		std::ostringstream	stream;
+	std::ostringstream	stream;
 	stream << errorCode;
 	std::string	errorCodeStr = stream.str();
 	this->_modifyStatus = errorCodeStr + " " + status + "\r\n";
@@ -48,7 +66,7 @@ HTTPResponse::HTTPResponse(const HTTPResponse &other):
 	_socketFD(other._socketFD)
 {}
 
-const HTTPResponse &HTTPResponse::operator=(const HTTPResponse &other)
+HTTPResponse &HTTPResponse::operator=(const HTTPResponse &other)
 {
 	if (this != &other)
 	{
@@ -127,11 +145,11 @@ void	HTTPResponse::setStatusMessage(const std::string statusMessage)
 }
 
 /************************ CONVERSION ****************** */
-void	HTTPResponse::processHTTPResponse()
-{
-	this->convertStatusLine();
-	this->addStatusLineToContent();
-}
+// void	HTTPResponse::processHTTPResponse()
+// {
+// 	this->convertStatusLine();
+// 	this->addStatusLineToContent();
+// }
 
 void	HTTPResponse::sendResponse() const
 {
@@ -171,7 +189,6 @@ void	HTTPResponse::convertStatusLine()
 	this->_modifyStatus = this->_statusLine.substr(colon_index + 1);
 	this->trimLeadingSpaces(this->_modifyStatus);
 	this->extractStatusCodeAndMessage();
-	this->reformatStatusLine();
 }
 
 void	HTTPResponse::reformatStatusLine()
@@ -219,7 +236,7 @@ void	HTTPResponse::addStatusLineToContent()
 
 /***************************** ERROR PAGES GENERATION ******************* */
 
-std::string HTTPResponse::generateErrorHTML(int code, const std::string &message) const
+std::string HTTPResponse::generateErrorHTML(int code, const std::string &message)
 {
 	std::ostringstream stream;
 	stream	<< "<!DOCTYPE html>\n"
@@ -229,17 +246,17 @@ std::string HTTPResponse::generateErrorHTML(int code, const std::string &message
 	return (stream.str());
 }
 
-std::string HTTPResponse::buildErrorResponse() const
+std::string HTTPResponse::buildErrorResponse()
 {
-	this->_content = generateErrorHTML(_statusCode, _statusMessage);
+	this->_body = generateErrorHTML(_statusCode, _statusMessage);
 
 	std::ostringstream stream;
 	stream	<< this->_formatedStatus
 			<< "Content-Type: text/html\r\n"
-			<< "Content-Length: " << body.size() << "\r\n"
+			<< "Content-Length: " << _body.size() << "\r\n"
 			<< "Connection: close\r\n"
 			<< "\r\n"
-			<< this->_content;
+			<< this->_body;
 
 	return (stream.str());
 }
