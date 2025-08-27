@@ -8,7 +8,7 @@
 	requestMap[socketFD] = HTTPRequest(socketFD); // create a new object if new connection
 */
 
-std::map<int, HTTPRequest> g_requestMap;
+// std::map<int, HTTPRequest> g_requestMap;
 
 void printRequest(const HTTPRequest &req)
 {
@@ -123,7 +123,7 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 	{
 		std::cerr << "Error while processing client data from socket " << socketFD << "!\n";
 
-		HTTPResponse error_response(400, "Bad Request");
+		HTTPResponse error_response("Bad Request", 400);
 		error_response.sendResponse();
 		return (true);
 	}
