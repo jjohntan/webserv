@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>408 - Request Timeout</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fff3cd;
+            margin: 0;
+            padding: 50px;
+            text-align: center;
+        }
+        .error-container {
+            background-color: white;
+            border: 2px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 40px;
+            max-width: 600px;
+            margin: 0 auto;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #856404;
+            font-size: 72px;
+            margin: 0;
+        }
+        h2 {
+            color: #856404;
+            margin: 20px 0;
+        }
+        p {
+            color: #856404;
+            font-size: 18px;
+            margin: 15px 0;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 30px;
+            padding: 12px 24px;
+            background-color: #856404;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .back-link:hover {
+            background-color: #6c4e03;
+        }
+        .error-details {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <h1>408</h1>
+        <h2>Request Timeout</h2>
+        <p>The server timed out waiting for the request.</p>
+        <div class="error-details">
+            <strong>This usually happens when:</strong>
+            <ul>
+                <li>The client took too long to send the complete request</li>
+                <li>Network connection is too slow</li>
+                <li>The request body was too large and transmission failed</li>
+                <li>Server timeout limits were exceeded</li>
+            </ul>
+        </div>
+        <p>Please try again with a faster connection or smaller request.</p>
+        <a href="/" class="back-link">← Back to Home</a>
+    </div>
+</body>
+</html>

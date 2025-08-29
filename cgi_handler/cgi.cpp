@@ -155,21 +155,38 @@ void CGIHandler::setupStandardCGIVars(const HTTPRequest& request, const std::str
     addEnvironmentVar("SERVER_PORT", "8080");
     addEnvironmentVar("REMOTE_ADDR", "127.0.0.1");
     
-    // Content length and type for POST requests
+    // Content length and type
+    const std::map<std::string, std::string>& headers = request.getHeaderMap();
+    std::map<std::string, std::string>::const_iterator ct_it = headers.find("content-type");
+    
+    // Debug: Print all headers
+    std::cout << "[DEBUG] CGI setupStandardCGIVars - All headers:" << std::endl;
+    for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it) {
+        std::cout << "[DEBUG] Header: '" << it->first << "' = '" << it->second << "'" << std::endl;
+    }
+    
     if (request.getMethod() == "POST") {
         const std::vector<char>& body = request.getBodyVector();
         addEnvironmentVar("CONTENT_LENGTH", intToString(body.size()));
         
         // Get content type from headers
-        const std::map<std::string, std::string>& headers = request.getHeaderMap();
-        std::map<std::string, std::string>::const_iterator ct_it = headers.find("content-type");
         if (ct_it != headers.end()) {
             addEnvironmentVar("CONTENT_TYPE", ct_it->second);
+            std::cout << "[DEBUG] CGI setupStandardCGIVars - Setting CONTENT_TYPE for POST: " << ct_it->second << std::endl;
         } else {
             addEnvironmentVar("CONTENT_TYPE", "application/x-www-form-urlencoded");
+            std::cout << "[DEBUG] CGI setupStandardCGIVars - Using default CONTENT_TYPE for POST" << std::endl;
         }
     } else {
         addEnvironmentVar("CONTENT_LENGTH", "0");
+        
+        // Set CONTENT_TYPE if present in headers, even for non-POST requests
+        if (ct_it != headers.end()) {
+            addEnvironmentVar("CONTENT_TYPE", ct_it->second);
+            std::cout << "[DEBUG] CGI setupStandardCGIVars - Setting CONTENT_TYPE for " << request.getMethod() << ": " << ct_it->second << std::endl;
+        } else {
+            std::cout << "[DEBUG] CGI setupStandardCGIVars - No CONTENT_TYPE header found for " << request.getMethod() << " request" << std::endl;
+        }
     }
 }
 

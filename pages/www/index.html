@@ -3,72 +3,280 @@
 <head>
     <title>WebServ Test Page</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        h1 { color: #333; }
-        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
-        .test-section h2 { margin-top: 0; }
-        a { color: #0066cc; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .code { background: #f5f5f5; padding: 10px; font-family: monospace; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f8ff;
+            margin: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+        }
+
+        .navigation {
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .navigation a {
+            display: inline-block;
+            margin: 5px 10px;
+            padding: 8px 15px;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .navigation a:hover {
+            background-color: #2980b9;
+        }
+
+        .interactive-section {
+            background-color: #fff;
+            padding: 20px;
+            border: 2px solid #bdc3c7;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .interactive-section input {
+            margin: 5px;
+            padding: 10px 15px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .interactive-section input:hover {
+            background-color: #c0392b;
+        }
+
+        .content-section {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .animated-text {
+            color: #e74c3c;
+            font-weight: bold;
+            animation: slideIn 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0.7; }
+            to { transform: translateX(20px); opacity: 1; }
+        }
+
+        .test-image {
+            max-width: 300px;
+            height: auto;
+            border-radius: 10px;
+            border: 3px solid #3498db;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .method-tests {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .method-tests ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .method-tests li {
+            background-color: #34495e;
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            background-color: #34495e;
+            color: white;
+            border-radius: 8px;
+        }
+
+        #message {
+            font-weight: bold;
+            color: #27ae60;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+
+        .upload-form {
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .upload-form input[type="file"] {
+            margin: 10px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: white;
+        }
+
+        .upload-form input[type="submit"] {
+            padding: 10px 20px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .upload-form input[type="submit"]:hover {
+            background-color: #219a52;
+        }
+
+        .directory-links a {
+            display: inline-block;
+            margin: 5px 10px;
+            padding: 8px 15px;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: transform 0.2s;
+        }
+
+        .directory-links a:hover {
+            transform: translateY(-2px);
+        }
     </style>
+    <script>
+        function showMessage() {
+            document.getElementById('message').innerHTML = 'Hello from WebServ! Static JavaScript is working perfectly!';
+        }
+
+        function changeColor() {
+            var colors = ['#f0f8ff', '#ffe4e1', '#f0fff0', '#fff8dc', '#e6e6fa'];
+            var randomColor = colors[Math.floor(Math.random() * colors.length)];
+            document.body.style.backgroundColor = randomColor;
+            document.getElementById('message').innerHTML = 'Background changed to: ' + randomColor;
+        }
+
+        function testHttpMethod(method, url) {
+            var xhr = new XMLHttpRequest();
+            xhr.open(method, url, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    document.getElementById('message').innerHTML = 
+                        method + ' request to ' + url + ' returned status: ' + xhr.status;
+                }
+            };
+            try {
+                xhr.send();
+            } catch(e) {
+                document.getElementById('message').innerHTML = 
+                    'Error testing ' + method + ': ' + e.message;
+            }
+        }
+
+        function showServerInfo() {
+            var port = window.location.port || '80';
+            var hostname = window.location.hostname;
+            document.getElementById('message').innerHTML = 
+                'Server: WebServ | Host: ' + hostname + ':' + port + ' | Static Website Mode ';
+        }
+
+        function testStatic() {
+            document.getElementById('message').innerHTML = 'Testing static file serving...';
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/images/test.jpg', true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        document.getElementById('message').innerHTML = 'Static files working! Status: ' + xhr.status;
+                    } else {
+                        document.getElementById('message').innerHTML = 'Static file test failed. Status: ' + xhr.status;
+                    }
+                }
+            };
+            xhr.onerror = function() {
+                document.getElementById('message').innerHTML = 'Static file test failed - connection error';
+            };
+            xhr.send();
+        }
+
+        window.onload = function() {
+            console.log('WebServ static page loaded successfully!');
+            console.log('Testing JavaScript execution...');
+            showServerInfo();
+        };
+    </script>
 </head>
 <body>
-    <h1>WebServ Test Page</h1>
-    <p>This is a simple test page for the WebServ HTTP server.</p>
+    <h1>WebServ HTTP Server - Static Website</h1>
+    <p id="page-description">Static file serving (HTML, CSS, JS, images) - Port 8080</p>
+    
+    <div class="navigation">
+        <h2>Test Pages:</h2>
+        <a href="about.html">About Page</a>
+        <a href="gallery.html">Image Gallery</a>
+    </div>
+    
+    <div class="interactive-section">
+        <h2>JavaScript Test:</h2>
+        <input type="button" onclick="showMessage()" value="Test JS" />
+        <input type="button" onclick="changeColor()" value="Change Color" />
+        <input type="button" onclick="showServerInfo()" value="Server Info" />
+        <input type="button" onclick="testStatic()" value="Test Static Files" />
+        <p id="message"></p>
+    </div>
+    
 
-    <div class="test-section">
-        <h2>1. CGI Test</h2>
-        <p>Test CGI functionality with Python scripts:</p>
-        <ul>
-            <li><a href="/cgi-bin/python/hello.py">Basic CGI Test</a> - Shows environment variables</li>
-            <li><a href="/cgi-bin/python/test.py">Simple CGI Test</a> - Basic CGI response</li>
-            <li><a href="/cgi-bin/python/hello.py?name=World">CGI with Parameters</a> - Test query string</li>
-        </ul>
-        <div class="code">
-            Expected: HTML page showing CGI environment variables and request info
+    <div class="content-section">
+        <h2>Directory Browsing:</h2>
+        <p>Browse available static directories</p>
+        <div class="directory-links">
+            <a href="/images/" style="background-color: #9b59b6;"> Images Directory</a>
+            <a href="/upload/" style="background-color: #27ae60;"> Upload Directory</a>
         </div>
+        <p><small>Directory listings depend on server configuration and autoindex settings.</small></p>
     </div>
 
-    <div class="test-section">
-        <h2>2. File Upload Test</h2>
-        <p>Test file upload functionality:</p>
-        <ul>
-            <li><a href="/cgi-bin/python/upload.py">File Upload System</a> - Upload and manage files</li>
-            <li><a href="/upload/">Upload Directory</a> - Browse uploaded files</li>
-        </ul>
-        <div class="code">
-            Expected: File upload form, ability to upload files and see them listed
+    <div class="content-section">
+        <h2>Static Files:</h2>
+        <p>This tests static file serving (HTML, CSS, JS, images)</p>
+        <div style="display: flex; justify-content: center;">
+            <img class="test-image" src="/images/test.jpg" alt="test image" />
         </div>
     </div>
-
-    <div class="test-section">
-        <h2>3. Static File Test</h2>
-        <p>Test static file serving:</p>
-        <ul>
-            <li><a href="/upload/upload.html">Upload Info Page</a> - Static HTML file</li>
-        </ul>
-        <div class="code">
-            Expected: Static HTML page should load normally
-        </div>
-    </div>
-
-    <div class="test-section">
-        <h2>4. Error Page Test</h2>
-        <p>Test error handling:</p>
-        <ul>
-            <li><a href="/nonexistent.html">404 Error</a> - Page not found</li>
-        </ul>
-        <div class="code">
-            Expected: Custom 404 error page
-        </div>
-    </div>
-
-    <h2>Testing Steps:</h2>
-    <ol>
-        <li>Start the server: <code>./webserver testconfig/test.conf</code></li>
-        <li>Open browser to: <code>http://localhost:8080</code></li>
-        <li>Click on each test link above</li>
-        <li>Check that each feature works as expected</li>
-    </ol>
+    
+    <footer>
+        <p>WebServ - Simple HTTP Server Implementation</p>
+    </footer>
 </body>
 </html>

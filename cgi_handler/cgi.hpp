@@ -14,7 +14,6 @@
 #include <cstring>
 #include "../http/HTTPRequest/HTTPRequest.hpp"
 
-// C++98 compatible string conversion
 std::string intToString(int value);
 
 
@@ -68,4 +67,4 @@ public:
     void clearEnvironment();
 };
 
-#endif // CGI_HPP
+#endif
