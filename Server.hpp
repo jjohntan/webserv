@@ -20,14 +20,12 @@
 class Server
 {
 	private:
-	int socket_fd;// store socket file descriptor
-	std::vector<int> listening_sockets;
-	std::vector<struct pollfd> pfds;
-	std::vector<ServerConfig> servers; // configurations parsed from config file
-	
-
-	// stored root for single-server compatibility (optional)
-	std::string root;
+		std::vector<int> listening_sockets;
+		std::vector<struct pollfd> pfds;
+		std::vector<ServerConfig> servers; // configurations parsed from config file
+		// stored root for single-server compatibility (optional)
+		std::string root;
+		
 		// helper
 		void addNewConnection(int listen_fd, std::map<int, HTTPRequest> &request_map);
 		// void readClientData(int i);
