@@ -13,6 +13,7 @@
 #include <poll.h>
 #include <iostream>
 #include <set>
+#include <fcntl.h>
 #include "http/HTTP.hpp"
 #include "http/HTTPRequest/HTTPRequest.hpp"
 
