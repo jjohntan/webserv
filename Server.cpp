@@ -1,6 +1,5 @@
 #include "Server.hpp"
 
-#define PORT "8080"
 #include <csignal>
 
 volatile sig_atomic_t g_running = true;
@@ -25,48 +24,12 @@ void Server::addPfds(int client_fd)
 	pfds.push_back(pfd);
 }
 
-void Server::readClientData(int i)
+void Server::addNewConnection(int listen_fd, std::map<int, HTTPRequest> &requestMap)
 {
-	char buf[1024];
-	int sender_fd = pfds[i].fd;
-	int bytes_received = recv(sender_fd, buf, sizeof(buf), 0);// receive incoming data from a connected client
-
-	if (bytes_received <= 0)
-	{
-		if (bytes_received == 0)
-		{
-			printf("server: socket %d closed\n", sender_fd);
-		}
-		else
-		{
-			perror("recv");
-		}
-		close(sender_fd);
-		removePfds(i);
-	}
-	else
-	{
-		printf("server: recv from fd %d: %s\n", sender_fd, buf);
-
-		for (int j = 0; j < pfds.size(); j++)
-		{
-			int dest_fd = pfds[j].fd;
-			if (dest_fd != socket_fd && dest_fd != sender_fd)
-			{
-				if (send(dest_fd, buf, bytes_received, 0) == -1)
-				{
-					perror("send");
-				}
-			}
-		}
-	}
-}
-
-void Server::addNewConnection()
-{
+	// cast it to a sockaddr pointer because of all the extra space it has for larger addresses
 	struct sockaddr_storage client_addr;
 	socklen_t addr_len = sizeof(client_addr);
-	int client_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &addr_len);
+	int client_fd = accept(listen_fd, (struct sockaddr *)&client_addr, &addr_len);
 
 	if (client_fd == -1)
 	{
@@ -75,40 +38,57 @@ void Server::addNewConnection()
 	else
 	{
 		addPfds(client_fd);
+		requestMap[client_fd] = HTTPRequest(client_fd); // create new HTTPRequest if haven't
 	}
+}
+
+bool Server::isListeningSocket(int fd)
+{
+	for (size_t i = 0; i < listening_sockets.size(); i++)
+	{
+		if (listening_sockets[i] == fd)// socket is our listening socket
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 // Main loop
 void Server::run()
 {
-	std::signal(SIGINT, signalHandler);
-    std::signal(SIGTERM, signalHandler);
+	std::map<int, HTTPRequest> request_map;
+
 	std::cout << "waiting for connections" << std::endl;
 	while (true)
 	{
-		int ready_fd = poll(pfds.data(), pfds.size(),-1);
+		int ready_fd = poll(pfds.data(), pfds.size(), -1);
 		if (ready_fd < 0)
 		{
 			perror("poll failed");
 			break;
 		}
-		for (int i = 0; i < pfds.size(); i++)
+
+		for (size_t i = 0; i < pfds.size(); i++)
 		{
+			// check if someone ready to read
 			if (pfds[i].revents & (POLLIN | POLLHUP))
 			{
-				if (pfds[i].fd == socket_fd)
+				// if is listener, it is a new connection
+				if (isListeningSocket(pfds[i].fd))
 				{
-					addNewConnection();
+					addNewConnection(pfds[i].fd, request_map);// accept a new connection
 				}
+				// just a regular client
 				else
 				{
-					readClientData(i);
+					readClientData(pfds[i].fd, request_map, pfds, i);
 				}
 			}
 			pfds[i].revents = 0;
 		}
 	}
-	  // Close all client connections
+	 // Close all client connections
     for (size_t i = 0; i < pfds.size(); i++)
     {
         if (pfds[i].fd >= 0)
@@ -117,12 +97,12 @@ void Server::run()
         }
     }
     
-    // Close server socket
-    if (socket_fd >= 0)
-    {
-        close(socket_fd);
-        socket_fd = -1;
-    }
+    // // Close server socket
+    // if (sockfd >= 0)
+    // {
+    //     close(sockfd);
+    //     sockfd = -1;
+    // }
     
     // Clear the pollfd vector
     pfds.clear();
@@ -130,67 +110,120 @@ void Server::run()
     std::cout << "Server shut down gracefully" << std::endl;
 }
 
-int Server::createListeningSocket()
+int Server::createListeningSocket(const std::string& port_str)
 {
 	int opt = 1;
-	int rv;
-	
-	// hints: parameter specifies the preferred socket type, or protocol
-	struct addrinfo hints, *ai, *p;
+	int res;
+	//
+	struct addrinfo hints, *ai, *ptr;
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;// use IPV4
-	hints.ai_socktype = SOCK_STREAM;// use TCP
+	hints.ai_family = AF_INET;       // use IPv4
+	hints.ai_socktype = SOCK_STREAM; // TCP
 	hints.ai_flags = AI_PASSIVE;
-	
-	if ((rv = getaddrinfo(NULL, PORT, &hints, &ai)) != 0)
+
+	//Allocate memory and create a new linked list of addrinfo
+	if ((res = getaddrinfo(NULL, port_str.c_str(), &hints, &ai)) != 0)
 	{
-		fprintf(stderr, "server: &s\n", rv);
-		exit(1);
+		fprintf(stderr, "server: %s\n", gai_strerror(res));
+		return -1;
 	}
+
+	int sockfd = -1;
 	
-	for (p = ai; p != NULL; p = p->ai_next)
+	// Set sockfd to non-blocking
+	fcntl(sockfd, F_SETFL, O_NONBLOCK);
+	for (ptr = ai; ptr != NULL; ptr = ptr->ai_next)
 	{
-		// creating socket
-		socket_fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-		if (socket_fd < 0)
+		sockfd = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+		if (sockfd < 0)
 		{
 			continue;
 		}
 		
-		// setting serverFd to allow multiple connection
-		setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
-		
-		// binding socket to the network address and port
-		if (bind(socket_fd, p->ai_addr, p->ai_addrlen) < 0)
+		// set sockfd to allow multiple connection
+		setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
+
+		if (bind(sockfd, ptr->ai_addr, ptr->ai_addrlen) < 0)
 		{
-			close(socket_fd);
+			close(sockfd);
+			sockfd = -1;
 			continue;
 		}
 		break;
 	}
-	if (p == NULL)
+	
+	if (ptr == NULL)
 	{
 		return -1;
 	}
-	freeaddrinfo(ai);
 	
-	//listening for incoming connection
-	if (listen(socket_fd, 10) == -1)
+	//deallocate memory created by geraddrinfo
+	freeaddrinfo(ai);
+
+	if (sockfd < 0)
+	{
+		return -1;
+	}
+
+	if (listen(sockfd, 10) == -1)
 	{
 		perror("listen");
+		close(sockfd);
 		return -1;
 	}
+
+	// keep track of listening socket
+	listening_sockets.push_back(sockfd);
+
+	// also add to poll set
 	struct pollfd pfd;
-	pfd.fd = socket_fd;// monitor server socket
-	pfd.events = POLLIN;
+	pfd.fd = sockfd;
+	pfd.events = POLLIN;// check ready to read
 	pfd.revents = 0;
 	pfds.push_back(pfd);
-	return socket_fd;
+
+	return sockfd;
 }
 
-Server::Server(): socket_fd(-1)
+bool Server::start()
+{
+	// collect unique ports from servers and create a listening socket for each
+	std::set<int> ports;
+	for (size_t i = 0; i < servers.size(); ++i)
+	{
+		ports.insert(servers[i].port);
+	}
+	// if no servers provided, fall back to default socket_fd if previously set
+	if (ports.empty())
+	{
+		// try to create a default listener on 8080
+		int fd = createListeningSocket(std::string("8080"));
+		return fd >= 0;
+	}
+
+	for (std::set<int>::const_iterator it = ports.begin(); it != ports.end(); ++it)
+	{
+		std::ostringstream oss;
+		oss << *it;
+		int fd = createListeningSocket(oss.str());
+		if (fd < 0)
+		{
+			std::cerr << "Failed to create listening socket on port " << *it << std::endl;
+			return false;
+		}
+	}
+	return true;
+}
+
+Server::Server()
 {
 
+}
+
+Server::Server(int port, const std::string& root, const std::vector<ServerConfig>& servers)
+: servers(servers), root(root)
+{
+	(void)port; // legacy single-port ctor keeps signature but real ports come from servers vector
 }
 
 Server::~Server()
