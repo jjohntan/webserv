@@ -604,11 +604,7 @@ const Location* Server::findMatchingLocation(const std::string& path, const std:
 std::string Server::buildFilePath(const std::string& request_path, const Location& location) {
     std::string clean_path = request_path;
     
-    // std::cout << "[DEBUG] buildFilePath - Original request_path: " << request_path << std::endl;
-    // std::cout << "[DEBUG] buildFilePath - Location path: " << location.path << std::endl;
-    // std::cout << "[DEBUG] buildFilePath - Location root: " << location.root << std::endl;
-    
-    // Remove query string if present
+   
     size_t query_pos = clean_path.find('?');
     if (query_pos != std::string::npos) {
         clean_path = clean_path.substr(0, query_pos);

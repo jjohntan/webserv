@@ -12,8 +12,8 @@
 
 class Server {
 private:
-    std::vector<int> server_fds;  // Changed from single int to vector
-    std::vector<int> ports;       // Store multiple ports
+    std::vector<int> server_fds; 
+    std::vector<int> ports;       
     std::string document_root;
     std::map<int, std::string> error_pages;
     std::vector<ServerConfig> server_configs;
