@@ -82,7 +82,7 @@ void Server::run()
 				// just a regular client
 				else
 				{
-					readClientData(pfds[i].fd, request_map, pfds, i);
+					readClientData(pfds[i].fd, request_map, pfds, i, servers);
 				}
 			}
 			pfds[i].revents = 0;
