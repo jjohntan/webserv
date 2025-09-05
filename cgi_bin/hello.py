@@ -128,19 +128,19 @@ print("<input type='submit' value='Test POST'>")
 print("</form>")
 
 print("<h3>File Upload Test:</h3>")
-print("<form method='POST' action='/cgi-bin/upload.py' enctype='multipart/form-data'>")
+print("<form method='POST' action='/cgi_bin/upload.py' enctype='multipart/form-data'>")
 print("Select file: <input type='file' name='file' required>")
 print("<input type='submit' value='Upload File'>")
 print("</form>")
 
 print("<h3>DELETE Test:</h3>")
 print("<p>Use curl to test DELETE:</p>")
-print("<pre>curl -X DELETE http://localhost:8081" + script_name + "</pre>")
+print("<pre>curl -X DELETE http://localhost:8081/cgi_bin/hello.py</pre>")
 
 print("<h2>Navigation:</h2>")
 print("<ul>")
 print("<li><a href='/'>Back to Home</a></li>")
-print("<li><a href='/cgi-bin/hello.py?test=simple'>Simple GET test</a></li>")
+print("<li><a href='/cgi_bin/hello.py?test=simple'>Simple GET test</a></li>")
 print("<li><a href='/upload/'>Upload Directory</a></li>")
 print("</ul>")
 

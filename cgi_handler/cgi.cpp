@@ -442,9 +442,13 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
             if (final_script_path.find(working_directory + "/") == 0) {
                 final_script_path = final_script_path.substr(working_directory.length() + 1);
             } else if (final_script_path.find("./cgi_bin/") == 0) {
-                final_script_path = final_script_path.substr(10); // Remove "./cgi_bin/"
+                final_script_path = final_script_path.substr(2); // Remove "./" but keep "cgi_bin/"
+            } else if (final_script_path.find("./") == 0) {
+                final_script_path = final_script_path.substr(2); // Remove "./"
             }
         }
+        
+        std::cout << "[DEBUG] CGI executeCGI - Final script path for execution: " << final_script_path << std::endl;
 
         
         // Redirect stdin and stdout

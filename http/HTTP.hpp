@@ -15,14 +15,13 @@
 # include "HTTPRequest/HTTPRequest.hpp"
 # include "HTTPResponse/HTTPResponse.hpp"
 # include "../cgi_handler/cgi.hpp"
+# include "../config_files/config.hpp"
 # include <map>
 # include <string>
 
 void	printRequest(const HTTPRequest &req);
-std::string	generateResponseBody(); // for hardcoded body
-void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::vector<struct pollfd>& fds, size_t &i);
-bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::string	data);
-CGIResult	runCGI(const HTTPRequest& request, const std::string& script_path, const std::map<std::string, std::string>& cgi_extensions, const std::string& working_directory);
-std::string	serveFile(const std::string& filePath);
+// std::string	generateResponseBody(); // for hardcoded body
+void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::vector<struct pollfd>& fds, size_t &i, const std::vector<ServerConfig>& servers);
+bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::string	data, const std::vector<ServerConfig>& servers);
 
 #endif

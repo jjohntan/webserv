@@ -34,7 +34,7 @@ if request_method == 'POST':
             # Check if file was actually uploaded
             if fileitem.filename:
                 # Create upload directory if it doesn't exist
-                upload_path = "../pages/upload"
+                upload_path = "pages/upload"
                 if not os.path.exists(upload_path):
                     os.makedirs(upload_path, mode=0o755)
                 
@@ -75,7 +75,7 @@ print(f"<p>Current Working Directory: {os.getcwd()}</p>")
 print("<h2>Test Links:</h2>")
 print("<ul>")
 print("<li><a href='/'>Back to Home</a></li>")
-print("<li><a href='/cgi-bin/python/hello.py'>CGI Test</a></li>")
+print("<li><a href='/cgi_bin/hello.py'>CGI Test</a></li>")
 print("<li><a href='/upload/'>Upload Directory</a></li>")
 print("</ul>")
 

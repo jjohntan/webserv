@@ -10,6 +10,7 @@ SOURCES = main.cpp \
           config_files/config.cpp \
           cgi_handler/cgi.cpp \
           http/HTTP.cpp \
+          http/http_cgi.cpp \
           http/HTTPRequest/HTTPRequest.cpp \
           http/HTTPResponse/HTTPResponse.cpp
 
@@ -19,6 +20,7 @@ OBJECTS = main.o \
           config.o \
           cgi.o \
           HTTP.o \
+          http_cgi.o \
           HTTPRequest.o \
           HTTPResponse.o
 
@@ -28,7 +30,8 @@ HEADERS = server.hpp \
           cgi_handler/cgi.hpp \
           http/HTTPRequest/HTTPRequest.hpp \
           http/HTTPResponse/HTTPResponse.hpp \
-          http/HTTP.hpp
+          http/HTTP.hpp \
+          http/http_cgi.hpp
 
 # Default target
 all: $(WEBSERVER)
@@ -42,7 +45,7 @@ $(WEBSERVER): $(OBJECTS)
 main.o: main.cpp server.hpp config_files/config.hpp
 	$(CXX) $(CXXFLAGS) -c main.cpp -o main.o
 
-server.o: server.cpp server.hpp cgi_handler/cgi.hpp http/HTTPRequest/HTTPRequest.hpp http/HTTPResponse/HTTPResponse.hpp config_files/config.hpp http/HTTP.hpp
+server.o: server.cpp server.hpp cgi_handler/cgi.hpp http/HTTPRequest/HTTPRequest.hpp http/HTTPResponse/HTTPResponse.hpp config_files/config.hpp http/HTTP.hpp http/http_cgi.hpp
 	$(CXX) $(CXXFLAGS) -c server.cpp -o server.o
 
 config.o: config_files/config.cpp config_files/config.hpp
@@ -52,8 +55,11 @@ cgi.o: cgi_handler/cgi.cpp cgi_handler/cgi.hpp http/HTTPRequest/HTTPRequest.hpp 
 	$(CXX) $(CXXFLAGS) -c cgi_handler/cgi.cpp -o cgi.o
 
 
-HTTP.o: http/HTTP.cpp http/HTTP.hpp http/HTTPRequest/HTTPRequest.hpp http/HTTPResponse/HTTPResponse.hpp cgi_handler/cgi.hpp
+HTTP.o: http/HTTP.cpp http/HTTP.hpp http/http_cgi.hpp http/HTTPRequest/HTTPRequest.hpp http/HTTPResponse/HTTPResponse.hpp cgi_handler/cgi.hpp
 	$(CXX) $(CXXFLAGS) -c http/HTTP.cpp -o HTTP.o
+
+http_cgi.o: http/http_cgi.cpp http/http_cgi.hpp http/HTTPRequest/HTTPRequest.hpp http/HTTPResponse/HTTPResponse.hpp cgi_handler/cgi.hpp config_files/config.hpp
+	$(CXX) $(CXXFLAGS) -c http/http_cgi.cpp -o http_cgi.o
 
 HTTPRequest.o: http/HTTPRequest/HTTPRequest.cpp http/HTTPRequest/HTTPRequest.hpp
 	$(CXX) $(CXXFLAGS) -c http/HTTPRequest/HTTPRequest.cpp -o HTTPRequest.o
