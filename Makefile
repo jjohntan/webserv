@@ -42,11 +42,11 @@ $(WEBSERVER): $(OBJECTS)
 	@echo "Web server build complete! Executable: $(WEBSERVER)"
 
 # Object file dependencies
-main.o: main.cpp server.hpp config_files/config.hpp
+main.o: main.cpp Server.hpp config_files/config.hpp
 	$(CXX) $(CXXFLAGS) -c main.cpp -o main.o
 
-server.o: server.cpp server.hpp cgi_handler/cgi.hpp http/HTTPRequest/HTTPRequest.hpp http/HTTPResponse/HTTPResponse.hpp config_files/config.hpp http/HTTP.hpp http/http_cgi.hpp
-	$(CXX) $(CXXFLAGS) -c server.cpp -o server.o
+Server.o: Server.cpp Server.hpp cgi_handler/cgi.hpp http/HTTPRequest/HTTPRequest.hpp http/HTTPResponse/HTTPResponse.hpp config_files/config.hpp http/HTTP.hpp http/http_cgi.hpp
+	$(CXX) $(CXXFLAGS) -c Server.cpp -o Server.o
 
 config.o: config_files/config.cpp config_files/config.hpp
 	$(CXX) $(CXXFLAGS) -c config_files/config.cpp -o config.o
