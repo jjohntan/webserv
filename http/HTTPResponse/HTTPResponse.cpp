@@ -163,7 +163,6 @@ void	HTTPResponse::sendResponse() const
 		if (sent == -1)
 		{
 			std::cerr << "Failed to send response to socket FD " << _socketFD << std::endl;
-			perror("send");
 			break;
 		}
 		total_sent += sent;

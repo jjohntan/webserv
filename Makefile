@@ -6,7 +6,7 @@ WEBSERVER = webserver
 
 # Source files
 SOURCES = main.cpp \
-          server.cpp \
+          Server.cpp \
           config_files/config.cpp \
           cgi_handler/cgi.cpp \
           http/HTTP.cpp \
@@ -16,7 +16,7 @@ SOURCES = main.cpp \
 
 # Object files
 OBJECTS = main.o \
-          server.o \
+          Server.o \
           config.o \
           cgi.o \
           HTTP.o \
@@ -25,7 +25,7 @@ OBJECTS = main.o \
           HTTPResponse.o
 
 # Header files
-HEADERS = server.hpp \
+HEADERS = Server.hpp \
           config_files/config.hpp \
           cgi_handler/cgi.hpp \
           http/HTTPRequest/HTTPRequest.hpp \
