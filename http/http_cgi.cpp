@@ -5,6 +5,74 @@
 #include <sstream>
 #include <iostream>
 
+// Enforce allowed_methods, redirects, error pages, 413 limit, and static DELETE
+// add near top of file (helpers)
+static const Location* getMatchingLocation(const std::string& path, const ServerConfig* sc)
+{
+	if (!sc) return NULL;
+	const Location* best = NULL;
+	size_t best_len = 0;
+	for (size_t i = 0; i < sc->locations.size(); ++i) {
+		const Location& L = sc->locations[i];
+		if (path.find(L.path) == 0 && L.path.length() > best_len) {
+			best = &L;
+			best_len = L.path.length();
+		}
+	}
+	return best;
+}
+
+static bool methodAllowed(const HTTPRequest& req, const Location* L)
+{
+	if (!L || L->allowed_methods.empty()) return true; // default allow if not configured
+	for (size_t i = 0; i < L->allowed_methods.size(); ++i) {
+		if (req.getMethod() == L->allowed_methods[i]) return true;
+	}
+	return false;
+}
+
+// Try to load configured error page; if not found, fall back to simple body
+static std::string loadErrorPageBody(int code, const ServerConfig* sc)
+{
+	// Try config-mapped page
+	if (sc) {
+		std::map<int, std::string>::const_iterator it = sc->error_pages.find(code);
+		if (it != sc->error_pages.end()) {
+			std::string mapped = it->second;
+			// If it's a URI like "/error/404.html", map to server root
+			if (!mapped.empty() && mapped[0] == '/' && !sc->root.empty()) {  // [CHANGE]
+				std::string fs = sc->root + mapped;                          // [CHANGE]
+				std::ifstream f(fs.c_str(), std::ios::in | std::ios::binary);
+				if (f) {
+					std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+					return content;
+				}
+			} else {
+				// Treat as filesystem path as-is
+				std::ifstream f(mapped.c_str(), std::ios::in | std::ios::binary);
+				if (f) {
+					std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+					return content;
+				}
+			}
+		}
+	}
+	// Fallback page
+	std::ostringstream os;
+	os << "<html><body><h1>" << code << "</h1></body></html>";
+	return os.str();
+}
+
+static void sendError( int code, const std::string& message, int socketFD, const ServerConfig* sc )
+{
+	std::string body = loadErrorPageBody(code, sc);
+	std::ostringstream len; len << body.size();
+	std::string full = "Content-Type: text/html\r\nContent-Length: " + len.str() + "\r\nConnection: close\r\n\r\n" + body;
+	HTTPResponse resp(message, code, full, socketFD);
+	resp.sendResponse();
+}
+/* --------------------------------------------------------------------------------------------------------------------------------*/
+
 // CGI call function
 CGIResult runCGI(const HTTPRequest& request, const std::string& script_path, const std::map<std::string, std::string>& cgi_extensions, const std::string& working_directory)
 {
@@ -161,175 +229,151 @@ std::map<std::string, std::string> getCGIExtensions(const std::string& path, con
 // Main function to handle CGI checking and file serving
 void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std::vector<ServerConfig>& servers)
 {
-	(void)socketFD; 
 	std::string path = request.getPath();
-	
-	// Find the server configuration for this request
+
+	// Server selection by Host:port
 	const ServerConfig* server_config = findServerConfig(request, servers);
-	
-	// Check if CGI is enabled for this path in the server configuration
+
+	// Pick the most specific location once
+	const Location* matching_location = getMatchingLocation(path, server_config); // [CHANGE]
+
+	// 405 Method Not Allowed (with Allow:)
+	if (matching_location && !methodAllowed(request, matching_location)) {        // [CHANGE]
+		std::ostringstream allow;
+		for (size_t i = 0; i < matching_location->allowed_methods.size(); ++i) {
+			if (i) allow << ", ";
+			allow << matching_location->allowed_methods[i];
+		}
+		std::string body = loadErrorPageBody(405, server_config);
+		std::ostringstream len; len << body.size();
+		std::string content = "Allow: " + allow.str() + "\r\n"
+								"Content-Type: text/html\r\n"
+								"Content-Length: " + len.str() + "\r\n"
+								"Connection: close\r\n\r\n" + body;
+		HTTPResponse resp("Method Not Allowed", 405, content, socketFD);
+		resp.sendResponse();
+		return;
+	}
+
+	// 413 Payload Too Large (client_max_body_size enforcement)
+	if (server_config && server_config->client_max_body_size > 0) {               // [CHANGE]
+		const std::vector<char>& b = request.getBodyVector();                     // (provided by HTTPRequest)
+		if (!b.empty() && b.size() > server_config->client_max_body_size) {
+			sendError(413, "Payload Too Large", socketFD, server_config);
+			return;
+		}
+	}
+
+	// 3xx redirect if configured in location
+	if (matching_location && matching_location->redirect_code > 0                // [CHANGE]
+		&& !matching_location->redirect_url.empty()) {
+		std::string body = "<html><body><h1>Redirect</h1><a href=\"" +
+							matching_location->redirect_url + "\">" +
+							matching_location->redirect_url + "</a></body></html>";
+		std::ostringstream len; len << body.size();
+		std::ostringstream hdr;
+		hdr << "Location: " << matching_location->redirect_url << "\r\n"
+			<< "Content-Type: text/html\r\n"
+			<< "Content-Length: " << len.str() << "\r\n"
+			<< "Connection: close\r\n\r\n"
+			<< body;
+		HTTPResponse resp("Found", matching_location->redirect_code, hdr.str(), socketFD);
+		resp.sendResponse();
+		return;
+	}
+
+	// Decide CGI vs Static
 	bool cgi_enabled = isCGIEnabled(path, server_config);
-	
 	if (cgi_enabled) {
-		// Get CGI extensions from server configuration
 		std::map<std::string, std::string> cgi_extensions = getCGIExtensions(path, server_config);
-		
 		CGIHandler cgi_handler;
 		if (cgi_handler.needsCGI(path, cgi_extensions)) {
-			// Resolve CGI script path based on location configuration
+			// Map /cgi_bin/* → ./cgi_bin/*
 			std::string script_path = path;
 			std::string working_directory = "./";
-			
-			// Handle /cgi_bin/ location - map to ./cgi_bin/ directory
 			if (path.find("/cgi_bin/") == 0) {
-				script_path = "./cgi_bin" + path.substr(8); // Remove "/cgi_bin" and add "./cgi_bin"
+				script_path = "./cgi_bin" + path.substr(8);
 				working_directory = "./";
 			}
-			
-			// Execute CGI script
+
+			// Execute CGI
 			std::cout << "Executing CGI Script: " << script_path << std::endl;
 			CGIResult cgi_result = runCGI(request, script_path, cgi_extensions, working_directory);
 			HTTPResponse response(cgi_result.status_message, cgi_result.status_code, cgi_result.content, socketFD);
-			// Sending response back to corresponding socket
 			std::cout << "Sending CGI Response Back to Socket\n";
 			response.sendResponse();
-		} else {
-			// CGI script not found, serve as static file
-			std::string filePath;
-			std::string server_root = server_config ? server_config->root : "pages/www";
-			
-			if (path == "/" || path.empty()) {
-				// Serve index.html for root path
-				filePath = server_root + "/index.html";
-			} else {
-				filePath = server_root + path;
-			}
-			
-			std::cout << "CGI Script Not Found - Serving as Static File: " << filePath << std::endl;
-			
-			std::string content = serveFile(filePath);
-			if (!content.empty()) {
-				// Add proper content type header for HTML files
-				std::string contentType = "text/html";
-				if (filePath.find(".css") != std::string::npos) {
-					contentType = "text/css";
-				} else if (filePath.find(".js") != std::string::npos) {
-					contentType = "application/javascript";
-				} else if (filePath.find(".jpg") != std::string::npos || filePath.find(".jpeg") != std::string::npos) {
-					contentType = "image/jpeg";
-				} else if (filePath.find(".png") != std::string::npos) {
-					contentType = "image/png";
-				}
-				
-				std::ostringstream contentLengthStream;
-				contentLengthStream << content.length();
-				std::string responseContent = "Content-Type: " + contentType + "\r\nContent-Length: " + contentLengthStream.str() + "\r\n\r\n" + content;
-				
-				HTTPResponse response("OK", 200, responseContent, socketFD);
-				std::cout << "Sending Response Back to Socket\n";
-				response.sendResponse();
-			} else {
-				// File not found, send 404
-				std::string errorHtml = "<html><body><h1>404 Not Found</h1><p>The requested file was not found.</p></body></html>";
-				std::ostringstream errorLengthStream;
-				errorLengthStream << errorHtml.length();
-				std::string errorContent = "Content-Type: text/html\r\nContent-Length: " + errorLengthStream.str() + "\r\n\r\n" + errorHtml;
-				HTTPResponse response("Not Found", 404, errorContent, socketFD);
-				std::cout << "Sending 404 Response Back to Socket\n";
-				response.sendResponse();
-			}
+			return;
 		}
-	} else {
-		// Serve static files using server configuration
-		std::string filePath;
-		std::string server_root = server_config ? server_config->root : "pages/www";
-		
-		// Check if this path matches a specific location with its own root
-		const Location* matching_location = NULL;
-		size_t best_match_length = 0;
-		
-		if (server_config) {
-			for (size_t i = 0; i < server_config->locations.size(); ++i) {
-				const Location& location = server_config->locations[i];
-				if (path.find(location.path) == 0 && location.path.length() > best_match_length) {
-					matching_location = &location;
-					best_match_length = location.path.length();
-				}
-			}
-		}
-		
-		// Use location-specific root if available
-		if (matching_location && !matching_location->root.empty()) {
-			server_root = matching_location->root;
-		}
-		
-		if (path == "/" || path.empty()) {
-			// Serve index.html for root 
-			filePath = server_root + "/index.html";
-		} else {
-			filePath = server_root + path;
-		}
-		
-		// Check if it's a directory request - Fixed the .back() issue
-		if (!filePath.empty() && filePath[filePath.length() - 1] == '/') {
-			// Directory request - check if autoindex is enabled
-			bool autoindex_enabled = false;
-			if (matching_location) {
-				autoindex_enabled = matching_location->autoindex;
-			}
-			
-			if (autoindex_enabled) {
-				// Generate directory listing
-				std::string dirListing = generateDirectoryListing(filePath);
-				std::ostringstream contentLengthStream;
-				contentLengthStream << dirListing.length();
-				std::string responseContent = "Content-Type: text/html\r\nContent-Length: " + contentLengthStream.str() + "\r\n\r\n" + dirListing;
-				
-				HTTPResponse response("OK", 200, responseContent, socketFD);
-				std::cout << "Sending Directory Listing Response Back to Socket\n";
-				response.sendResponse();
-			} else {
-				// Autoindex disabled, send 403 Forbidden
-				std::string errorHtml = "<html><body><h1>403 Forbidden</h1><p>Directory listing is not allowed.</p></body></html>";
-				std::ostringstream errorLengthStream;
-				errorLengthStream << errorHtml.length();
-				std::string errorContent = "Content-Type: text/html\r\nContent-Length: " + errorLengthStream.str() + "\r\n\r\n" + errorHtml;
-				HTTPResponse response("Forbidden", 403, errorContent, socketFD);
-				std::cout << "Sending 403 Response Back to Socket\n";
-				response.sendResponse();
-			}
-		} else {
-			std::string content = serveFile(filePath);
-			if (content.empty()) {
-				// File not found, send 404
-				std::string errorHtml = "<html><body><h1>404 Not Found</h1><p>The requested file was not found.</p></body></html>";
-				std::ostringstream errorLengthStream;
-				errorLengthStream << errorHtml.length();
-				std::string errorContent = "Content-Type: text/html\r\nContent-Length: " + errorLengthStream.str() + "\r\n\r\n" + errorHtml;
-				HTTPResponse response("Not Found", 404, errorContent, socketFD);
-				std::cout << "Sending 404 Response Back to Socket\n";
-				response.sendResponse();
-			} else {
-				// Add proper content type header for HTML files
-				std::string contentType = "text/html";
-				if (filePath.find(".css") != std::string::npos) {
-					contentType = "text/css";
-				} else if (filePath.find(".js") != std::string::npos) {
-					contentType = "application/javascript";
-				} else if (filePath.find(".jpg") != std::string::npos || filePath.find(".jpeg") != std::string::npos) {
-					contentType = "image/jpeg";
-				} else if (filePath.find(".png") != std::string::npos) {
-					contentType = "image/png";
-				}
-				
-				std::ostringstream contentLengthStream;
-				contentLengthStream << content.length();
-				std::string responseContent = "Content-Type: " + contentType + "\r\nContent-Length: " + contentLengthStream.str() + "\r\n\r\n" + content;
-				
-				HTTPResponse response("OK", 200, responseContent, socketFD);
-				std::cout << "Sending Response Back to Socket\n";
-				response.sendResponse();
-			}
-		}
+		// fall-through to static if needsCGI()==false
 	}
-}
+
+	// -------- Static serving (also handles DELETE) --------
+
+	// Effective root (location root overrides server root)
+	std::string server_root = server_config ? server_config->root : "pages/www";  // [CHANGE]
+	if (matching_location && !matching_location->root.empty())
+		server_root = matching_location->root;
+
+	// Per-location index for "/" paths
+	std::string filePath;                                                         // [CHANGE]
+	if (path == "/" || path.empty()) {
+		std::string indexName = (matching_location && !matching_location->index.empty())
+								? matching_location->index : "index.html";
+		filePath = server_root + "/" + indexName;
+	} else {
+		filePath = server_root + path;
+	}
+
+	// Static DELETE (only files, not directories)
+	if (request.getMethod() == "DELETE") {                                        // [CHANGE]
+		struct stat st;
+		if (stat(filePath.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+			if (std::remove(filePath.c_str()) == 0) {
+				std::string content = "Content-Length: 0\r\nConnection: close\r\n\r\n";
+				HTTPResponse resp("No Content", 204, content, socketFD);
+				resp.sendResponse();
+			} else {
+				sendError(403, "Forbidden", socketFD, server_config);
+			}
+		} else {
+			sendError(404, "Not Found", socketFD, server_config);
+		}
+		return;
+	}
+
+	// Directory request → autoindex or 403
+	if (!filePath.empty() && filePath[filePath.length() - 1] == '/') {
+		bool autoindex_enabled = (matching_location ? matching_location->autoindex : false);
+		if (autoindex_enabled) {
+			std::string dirListing = generateDirectoryListing(filePath);
+			std::ostringstream contentLengthStream; contentLengthStream << dirListing.length();
+			std::string responseContent = "Content-Type: text/html\r\nContent-Length: "
+											+ contentLengthStream.str() + "\r\n\r\n" + dirListing;
+			HTTPResponse response("OK", 200, responseContent, socketFD);
+			response.sendResponse();
+		} else {
+			sendError(403, "Forbidden", socketFD, server_config);                 // [CHANGE]
+		}
+		return;
+	}
+
+	// Regular file
+	std::string content = serveFile(filePath);
+	if (content.empty()) {
+		sendError(404, "Not Found", socketFD, server_config);                     // [CHANGE]
+		return;
+	}
+
+	// Content-Type (basic)
+	std::string contentType = "text/html";
+	if (filePath.find(".css") != std::string::npos) contentType = "text/css";
+	else if (filePath.find(".js")  != std::string::npos) contentType = "application/javascript";
+	else if (filePath.find(".jpg") != std::string::npos || filePath.find(".jpeg") != std::string::npos) contentType = "image/jpeg";
+	else if (filePath.find(".png") != std::string::npos) contentType = "image/png";
+
+	std::ostringstream contentLengthStream; contentLengthStream << content.length();
+	std::string responseContent = "Content-Type: " + contentType + "\r\nContent-Length: "
+									+ contentLengthStream.str() + "\r\n\r\n" + content;
+	HTTPResponse response("OK", 200, responseContent, socketFD);
+	response.sendResponse();
+	}

@@ -7,6 +7,10 @@
 #include <map>
 #include <string>
 #include <vector>
+// [CHANGE] needed for stat()
+#include <sys/stat.h>
+// [CHANGE] needed for std::remove
+#include <cstdio>
 
 // CGI and file serving functions
 CGIResult runCGI(const HTTPRequest& request, const std::string& script_path, const std::map<std::string, std::string>& cgi_extensions, const std::string& working_directory);
