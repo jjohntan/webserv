@@ -16,7 +16,7 @@ SOURCES = main.cpp \
 
 # Object files
 OBJECTS = main.o \
-          server.o \
+          Server.o \
           config.o \
           cgi.o \
           HTTP.o \
