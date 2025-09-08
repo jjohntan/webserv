@@ -37,7 +37,7 @@ class	HTTPResponse
 		HTTPResponse( std::string statusMessage, int statusCode, std::string content, int socketFD);
 		HTTPResponse(std::string status, int errorCode); // default content error
 		HTTPResponse(std::string status, int errorCode, std::string	content);
-		~HTTPResponse();
+		virtual ~HTTPResponse();
 		HTTPResponse(const HTTPResponse &other);
 		HTTPResponse	&operator=(const HTTPResponse &other);
 

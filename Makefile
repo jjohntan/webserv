@@ -12,17 +12,19 @@ SOURCES = main.cpp \
           http/HTTP.cpp \
           http/http_cgi.cpp \
           http/HTTPRequest/HTTPRequest.cpp \
-          http/HTTPResponse/HTTPResponse.cpp
+          http/HTTPResponse/HTTPResponse.cpp \
+		  http/HTTPResponse/ErrorResponse.cpp \
 
 # Object files
 OBJECTS = main.o \
-          Server.o \
+          server.o \
           config.o \
           cgi.o \
           HTTP.o \
           http_cgi.o \
           HTTPRequest.o \
-          HTTPResponse.o
+          HTTPResponse.o \
+		  ErrorResponse.o \
 
 # Header files
 HEADERS = Server.hpp \
@@ -31,7 +33,8 @@ HEADERS = Server.hpp \
           http/HTTPRequest/HTTPRequest.hpp \
           http/HTTPResponse/HTTPResponse.hpp \
           http/HTTP.hpp \
-          http/http_cgi.hpp
+          http/http_cgi.hpp \
+		  http/HTTPResponse/ErrorResponse.hpp \
 
 # Default target
 all: $(WEBSERVER)
@@ -66,6 +69,9 @@ HTTPRequest.o: http/HTTPRequest/HTTPRequest.cpp http/HTTPRequest/HTTPRequest.hpp
 
 HTTPResponse.o: http/HTTPResponse/HTTPResponse.cpp http/HTTPResponse/HTTPResponse.hpp
 	$(CXX) $(CXXFLAGS) -c http/HTTPResponse/HTTPResponse.cpp -o HTTPResponse.o
+
+ErrorResponse.o: http/HTTPResponse/ErrorResponse.cpp http/HTTPResponse/ErrorResponse.hpp
+	$(CXX) $(CXXFLAGS) -c http/HTTPResponse/ErrorResponse.cpp -o ErrorResponse.o
 
 # Clean targets
 clean:
