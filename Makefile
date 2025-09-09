@@ -99,6 +99,10 @@ run: $(WEBSERVER)
 	@echo "Starting webserver with test config..."
 	./$(WEBSERVER) testconfig/test.conf
 
+valgrind:
+	@echo "Starting webserver with test config and valgrind..."
+	valgrind --leak-check=full ./$(WEBSERVER) testconfig/test.conf
+
 # Debug build
 debug: CXXFLAGS += -DDEBUG -g3
 debug: $(WEBSERVER)
