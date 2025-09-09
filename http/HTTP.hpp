@@ -14,10 +14,23 @@
 
 # include "HTTPRequest/HTTPRequest.hpp"
 # include "HTTPResponse/HTTPResponse.hpp"
+# include "HTTPResponse/ErrorResponse.hpp"
 # include "../cgi_handler/cgi.hpp"
 # include "../config_files/config.hpp"
 # include <map>
 # include <string>
+
+const ServerConfig* getActiveServer(const std::vector<ServerConfig>& serverConfig);
+const Location* getMatchingLocation(const std::string& path,
+									const std::vector<ServerConfig>& serverConfig);
+
+const	Location* getMatchingLocation(const std::string &path, const ServerConfig* servercConfig);
+bool	methodAllowed(const HTTPRequest &request, const Location *Location);
+bool	checkAllowedMethod(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig);
+bool	checkPayLoad(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig);
+const char* reasonPhrase(int code);
+bool	checkRedirectResponse(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig);
+
 
 void	printRequest(const HTTPRequest &req);
 // std::string	generateResponseBody(); // for hardcoded body

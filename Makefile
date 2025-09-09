@@ -1,4 +1,4 @@
-CXX = g++
+CXX = c++
 CXXFLAGS = -std=c++98 -Wall -Wextra -Werror -g
 
 # Target executable
@@ -7,12 +7,14 @@ WEBSERVER = webserver
 # Source files
 SOURCES = main.cpp \
           Server.cpp \
+          Server.cpp \
           config_files/config.cpp \
           cgi_handler/cgi.cpp \
           http/HTTP.cpp \
           http/http_cgi.cpp \
           http/HTTPRequest/HTTPRequest.cpp \
-          http/HTTPResponse/HTTPResponse.cpp
+          http/HTTPResponse/HTTPResponse.cpp \
+		  http/HTTPResponse/ErrorResponse.cpp \
 
 # Object files
 OBJECTS = main.o \
@@ -22,16 +24,19 @@ OBJECTS = main.o \
           HTTP.o \
           http_cgi.o \
           HTTPRequest.o \
-          HTTPResponse.o
+          HTTPResponse.o \
+		  ErrorResponse.o \
 
 # Header files
+HEADERS = Server.hpp \
 HEADERS = Server.hpp \
           config_files/config.hpp \
           cgi_handler/cgi.hpp \
           http/HTTPRequest/HTTPRequest.hpp \
           http/HTTPResponse/HTTPResponse.hpp \
           http/HTTP.hpp \
-          http/http_cgi.hpp
+          http/http_cgi.hpp \
+		  http/HTTPResponse/ErrorResponse.hpp \
 
 # Default target
 all: $(WEBSERVER)
@@ -43,10 +48,11 @@ $(WEBSERVER): $(OBJECTS)
 
 # Object file dependencies
 main.o: main.cpp Server.hpp config_files/config.hpp
+main.o: main.cpp Server.hpp config_files/config.hpp
 	$(CXX) $(CXXFLAGS) -c main.cpp -o main.o
 
-Server.o: Server.cpp Server.hpp cgi_handler/cgi.hpp http/HTTPRequest/HTTPRequest.hpp http/HTTPResponse/HTTPResponse.hpp config_files/config.hpp http/HTTP.hpp http/http_cgi.hpp
-	$(CXX) $(CXXFLAGS) -c Server.cpp -o Server.o
+server.o: Server.cpp Server.hpp cgi_handler/cgi.hpp http/HTTPRequest/HTTPRequest.hpp http/HTTPResponse/HTTPResponse.hpp config_files/config.hpp http/HTTP.hpp http/http_cgi.hpp
+	$(CXX) $(CXXFLAGS) -c Server.cpp -o server.o
 
 config.o: config_files/config.cpp config_files/config.hpp
 	$(CXX) $(CXXFLAGS) -c config_files/config.cpp -o config.o
@@ -66,6 +72,9 @@ HTTPRequest.o: http/HTTPRequest/HTTPRequest.cpp http/HTTPRequest/HTTPRequest.hpp
 
 HTTPResponse.o: http/HTTPResponse/HTTPResponse.cpp http/HTTPResponse/HTTPResponse.hpp
 	$(CXX) $(CXXFLAGS) -c http/HTTPResponse/HTTPResponse.cpp -o HTTPResponse.o
+
+ErrorResponse.o: http/HTTPResponse/ErrorResponse.cpp http/HTTPResponse/ErrorResponse.hpp
+	$(CXX) $(CXXFLAGS) -c http/HTTPResponse/ErrorResponse.cpp -o ErrorResponse.o
 
 # Clean targets
 clean:
