@@ -26,6 +26,7 @@ class	HTTPRequest
 		std::string	_rawBody;
 		bool	_headerComplete;
 		bool	_bodyComplete;
+		bool	_connectionAlive;
 
 		/* Header */
 		std::map<std::string, std::string> _header;
@@ -63,6 +64,8 @@ class	HTTPRequest
 		void	analyzeHeader();
 		void	checkContentLength();
 		void	checkChunked();
+		void	processConnection();
+		bool	evaluateAlive(const std::string version, const bool hasConnection, const std::string connection);
 
 		/* Body */
 		void	processChunked();
@@ -85,6 +88,7 @@ class	HTTPRequest
 		const std::vector<char> &getBodyVector() const;
 		bool isHeaderComplete() const;
 		bool isBodyComplete() const;
+		bool isConnectionAlive() const;
 		bool isChunked() const;
 		const std::string &getMethod() const;
 		const std::string &getPath() const;
@@ -95,6 +99,7 @@ class	HTTPRequest
 		void setRawString(std::string &rawString);
 		void setRawHeader(const std::string &rawHeader);
 		void setRawBody(const std::string &rawBody);
+		void setConnectionAlive(const bool &connectionAlive);
 		void setHeaderMap(const std::map<std::string, std::string> &header);
 		void setBodyVector(const std::vector<char> &body);
 		void setMethod(const std::string &method);
@@ -119,6 +124,9 @@ class	HTTPRequest
 			public:
 				const char *what() const throw ();
 		};
+
+		/* Utility */
+		std::string	connectionHeader(bool keep) const;
 };
 
 #endif

@@ -75,7 +75,8 @@ bool	checkAllowedMethod(const HTTPRequest &request, int socketFD, const std::vec
 			allow << matching_location->allowed_methods[i];
 		}
 		// RFC requires Allow header for 405
-		const std::string extra = "Allow: " + allow.str() + "\r\n";
+		bool keep = request.isConnectionAlive();
+		const std::string extra = "Allow: " + allow.str() + "\r\n" + request.connectionHeader(keep);
 
 		ErrorResponse resp(405, "Method Not Allowed",
 							*active,
@@ -100,9 +101,13 @@ bool	checkPayLoad(const HTTPRequest &request, int socketFD, const std::vector<Se
 		const std::vector<char>&body = request.getBodyVector();
 		if (body.size() > active->client_max_body_size)
 		{
-			ErrorResponse resp(413, "Payload Too Large", *active, socketFD);
+			bool keep = request.isConnectionAlive();
+			ErrorResponse resp(413, "Payload Too Large", *active, request.connectionHeader(keep), socketFD);
 			resp.sendResponse();
-			return (true);
+			if (keep == true)
+				return (false);
+			else
+				return (true);
 		}
 	}
 	return (false);
@@ -164,8 +169,9 @@ bool	checkRedirectResponse(const HTTPRequest &request, int socketFD, const std::
 		std::ostringstream out;
 		out << "Location: " << url << "\r\n"
 			<< "Content-Type: text/html\r\n"
-			<< "Content-Length: " << body.size() << "\r\n"
-			<< "Connection: close\r\n"
+			<< "Content-Length: " << body.size() << "\r\n";
+		bool keep = request.isConnectionAlive();
+		out << request.connectionHeader(keep)
 			<< "\r\n";
 		if (include_body)
 			out << body;
@@ -191,6 +197,8 @@ void	printRequest(const HTTPRequest &request)
 
 	std::cout << GREEN << "\n--- Body ---\n" << RESET;
 	std::cout << request.getRawBody() << std::endl;
+
+	std::cout << GREEN << "\n--- From printRequest ---\n" << RESET;
 }
 
 void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::vector<struct pollfd>& fds, size_t &i, const std::vector<ServerConfig>& servers)
@@ -245,7 +253,10 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 			
 			// Call the main CGI and file serving function
 			handleRequestProcessing(requestMap[socketFD], socketFD, servers);
-			return (true);
+
+			// Close only if not keep-alive
+			bool	keep = requestMap[socketFD].isConnectionAlive();
+			return (!keep);
 		}
 		return (false); // so that clearing not happen
 	}
@@ -258,8 +269,10 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 		if (active)
 		{
 			// Use your ErrorResponse: resolves error_pages[400] under sc->root
-			ErrorResponse err(400, "Bad Request", *active, socketFD);
-			err.sendResponse();
+			bool keep = requestMap[socketFD].isConnectionAlive();
+			ErrorResponse err(400, "Bad Request", *active,
+							requestMap[socketFD].connectionHeader(keep),
+							socketFD);
 		}
 		else
 		{
