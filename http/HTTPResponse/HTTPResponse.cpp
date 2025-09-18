@@ -8,6 +8,11 @@ HTTPResponse::HTTPResponse(std::string statusLine, std::string content, int sock
 	_content(content),
 	_socketFD(socketFD)
 {
+	if (!_content.empty())
+		this->separateHeaderBody();
+	if (!_body.empty())
+		this->countBodyLen();
+	this->ensureContentLength();
 	this->convertStatusLine();
 	this->reformatStatusLine();
 	this->addStatusLineToContent();
@@ -19,6 +24,11 @@ HTTPResponse::HTTPResponse(std::string statusMessage, int statusCode, std::strin
 	_content(content),
 	_socketFD(socketFD)
 {
+	if (!_content.empty())
+		this->separateHeaderBody();
+	if (!_body.empty())
+		this->countBodyLen();
+	this->ensureContentLength();
 	std::ostringstream	stream;
 	stream << statusCode;
 	std::string	codeStr = stream.str();
@@ -28,7 +38,7 @@ HTTPResponse::HTTPResponse(std::string statusMessage, int statusCode, std::strin
 }
 
 /* For Error Page Generation - Default Body*/
-HTTPResponse::HTTPResponse(std::string status, int errorCode):
+HTTPResponse::HTTPResponse(std::string status, int errorCode, bool keep):
 	_statusCode(errorCode),
 	_statusMessage(status)
 {
@@ -37,7 +47,10 @@ HTTPResponse::HTTPResponse(std::string status, int errorCode):
 	std::string	errorCodeStr = stream.str();
 	this->_modifyStatus = errorCodeStr + " " + status + "\r\n";
 	this->reformatStatusLine();
-	this->_content = this->buildErrorResponse();
+	this->_content = this->buildErrorResponse(keep);
+	if (!_body.empty())
+		this->countBodyLen();
+	this->ensureContentLength();
 	this->addStatusLineToContent();
 }
 
@@ -52,6 +65,11 @@ HTTPResponse::HTTPResponse(std::string status, int errorCode, std::string conten
 	this->_modifyStatus = errorCodeStr + " " + status + "\r\n";
 	this->reformatStatusLine();
 	this->_content = content;
+	if (!_content.empty())
+		this->separateHeaderBody();
+	if (!_body.empty())
+		this->countBodyLen();
+	this->ensureContentLength();
 	this->addStatusLineToContent();
 }
 
@@ -63,6 +81,9 @@ HTTPResponse::HTTPResponse(const HTTPResponse &other):
 	_formatedStatus(other._formatedStatus),
 	_completeRawResponse(other._completeRawResponse),
 	_content(other._content),
+	_header(other._header),
+	_body(other._body),
+	_bodyLen(other._bodyLen),
 	_socketFD(other._socketFD)
 {}
 
@@ -77,6 +98,9 @@ HTTPResponse &HTTPResponse::operator=(const HTTPResponse &other)
 		_formatedStatus = other._formatedStatus;
 		_completeRawResponse = other._completeRawResponse;
 		_content = other._content;
+		_header = other._header;
+		_body = other._body;
+		_bodyLen = other._bodyLen;
 		_socketFD = other._socketFD;
 	}
 	return (*this);
@@ -115,6 +139,11 @@ int HTTPResponse::getStatusCode() const
 const std::string &HTTPResponse::getStatusMessage() const
 {
 	return (this->_statusMessage);
+}
+
+int	HTTPResponse::getBodyLen() const
+{
+	return (static_cast<int>(this->_bodyLen));
 }
 
 /****************************SETTERS***************************** */
@@ -228,9 +257,62 @@ void	HTTPResponse::extractStatusCodeAndMessage()
 
 /*************************** BODY & HEADER ********************* */
 
+void	HTTPResponse::separateHeaderBody()
+{
+	// Find the CRLFCRLF sequence that separates headers from body
+	std::string::size_type pos = this->_content.find("\r\n\r\n");
+
+	if (pos != std::string::npos)
+	{
+		// Header: everything up to (but not including) CRLFCRLF
+		this->_header = this->_content.substr(0, pos);
+
+		// Body: everything after CRLFCRLF (skip 4 chars)
+		this->_body = this->_content.substr(pos + 4);
+	}
+	else
+	{
+		// No delimiter found → assume the entire thing is header
+		this->_header = this->_content;
+		this->_body.clear();
+	}
+}
+
+void	HTTPResponse::countBodyLen()
+{
+	if (!this->_body.empty())
+		this->_bodyLen = this->_body.size();
+	else
+		this->_bodyLen = 0;
+}
+
 void	HTTPResponse::addStatusLineToContent()
 {
 	this->_completeRawResponse = this->_formatedStatus + this->_content;
+}
+
+void HTTPResponse::ensureContentLength()
+{
+	// Only add if body exists
+	if (_body.empty())
+		return;
+
+	// Case-insensitive search for "Content-Length"
+	std::string headerLower = _header;
+	for (size_t i = 0; i < headerLower.size(); ++i)
+		headerLower[i] = std::tolower(static_cast<unsigned char>(headerLower[i]));
+
+	if (headerLower.find("content-length:") == std::string::npos)
+	{
+		std::ostringstream stream;
+		stream << "Content-Length: " << _body.size() << "\r\n";
+
+		// Append to header
+		_header += "\r\n" + stream.str();
+
+		// Rebuild _content with header + CRLF + body
+		_content = _header + "\r\n" + _body;
+	}
 }
 
 /***************************** ERROR PAGES GENERATION ******************* */
@@ -245,18 +327,16 @@ std::string HTTPResponse::generateErrorHTML(int code, const std::string &message
 	return (stream.str());
 }
 
-std::string HTTPResponse::buildErrorResponse()
+std::string HTTPResponse::buildErrorResponse(bool keep)
 {
 	this->_body = generateErrorHTML(_statusCode, _statusMessage);
-
 	std::ostringstream stream;
-	stream	<< this->_formatedStatus
+	stream << this->_formatedStatus
 			<< "Content-Type: text/html\r\n"
 			<< "Content-Length: " << _body.size() << "\r\n"
-			<< "Connection: close\r\n"
+			<< (keep ? "Connection: keep-alive\r\n" : "Connection: close\r\n")
 			<< "\r\n"
 			<< this->_body;
-
 	return (stream.str());
 }
 

@@ -105,10 +105,12 @@ std::string	ErrorResponse::makeHeaderBody(const std::string &filePath, int statu
 		out << extraHeaders;
 	
 	out << "Content-Type: text/html\r\n"
-		<< "Content-Length: " << body.size() << "\r\n"
-		<< "Connection: close\r\n"
-		<< "\r\n"
-		<< body;
+		<< "Content-Length: " << body.size() << "\r\n";
+
+	if (!hasConnectionHeader(extraHeaders))
+		out << "Connection: close\r\n";
+
+	out << "\r\n" << body;
 
 	return (out.str());
 }
@@ -143,4 +145,28 @@ std::string ErrorResponse::fallbackHTML(int statusCode, const std::string &statu
 			<< "margin:40px\"><h1>" << statusCode << " " << statusMessage << "</h1>\n"
 			<< "<p>The server could not process your request.</p></body></html>\n";
 	return (html.str());
+}
+
+/* Utility */
+bool hasConnectionHeader(const std::string &s)
+{
+	for (size_t i = 0; i + 11 <= s.size(); ++i)
+	{
+		// look for "\nconnection:" or start-of-string "connection:"
+		if ((i == 0 || s[i-1] == '\n' || (i>=2 && s[i-2]=='\r' && s[i-1]=='\n')))
+		{
+			// case-insensitive compare
+			const char *p = "connection:";
+			size_t j = 0;
+			size_t k = i;
+			while (p[j] && k < s.size() && std::tolower(s[k]) == p[j])
+			{
+				++j;
+				++k;
+			}
+			if (!p[j])
+				return (true);
+		}
+	}
+	return (false);
 }

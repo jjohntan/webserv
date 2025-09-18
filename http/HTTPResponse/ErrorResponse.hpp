@@ -34,4 +34,7 @@ class	ErrorResponse: public HTTPResponse
 
 };
 
+/* Utility */
+bool	hasConnectionHeader(const std::string &s);
+
 #endif

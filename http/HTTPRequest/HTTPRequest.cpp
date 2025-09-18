@@ -3,6 +3,7 @@
 HTTPRequest::HTTPRequest():
 	_headerComplete(false),
 	_bodyComplete(false),
+	_connectionAlive(true),
 	_isChunked(false),
 	_chunkedComplete(false),
 	_bodyPos(0),
@@ -15,6 +16,7 @@ HTTPRequest::HTTPRequest(int socketFD):
 	_socketFD(socketFD),
 	_headerComplete(false),
 	_bodyComplete(false),
+	_connectionAlive(true),
 	_isChunked(false),
 	_chunkedComplete(false),
 	_bodyPos(0),
@@ -26,7 +28,7 @@ HTTPRequest::HTTPRequest(int socketFD):
 HTTPRequest::HTTPRequest(const HTTPRequest &other):
 	_socketFD(other._socketFD), _rawString(other._rawString), _rawHeader(other._rawHeader),
 	_rawBody(other._rawBody), _headerComplete(other._headerComplete),
-	_bodyComplete(other._bodyComplete), _header(other._header),
+	_bodyComplete(other._bodyComplete), _connectionAlive(other._connectionAlive),_header(other._header),
 	_body(other._body), _isChunked(other._isChunked),
 	_chunkedComplete(other._chunkedComplete), _bodyPos(other._bodyPos),
 	_chunkSize(other._chunkSize), _content_length(other._content_length),
@@ -46,6 +48,7 @@ HTTPRequest &HTTPRequest::operator=(const HTTPRequest &other)
 		this->_body = other._body;
 		this->_headerComplete = other._headerComplete;
 		this->_bodyComplete = other._bodyComplete;
+		this->_connectionAlive = other._connectionAlive;
 		this->_isChunked = other._isChunked;
 		this->_chunkedComplete = other._chunkedComplete;
 		this->_bodyPos = other._bodyPos;
@@ -99,6 +102,11 @@ bool HTTPRequest::isBodyComplete() const
 	return (this->_bodyComplete);
 }
 
+bool HTTPRequest::isConnectionAlive() const
+{
+	return (this->_connectionAlive);
+}
+
 bool HTTPRequest::isChunked() const
 {
 	return (this->_isChunked);
@@ -138,6 +146,11 @@ void HTTPRequest::setRawHeader(const std::string &rawHeader)
 void HTTPRequest::setRawBody(const std::string &rawBody)
 {
 	this->_rawBody = rawBody;
+}
+
+void HTTPRequest::setConnectionAlive(const bool &connectionAlive)
+{
+	this->_connectionAlive = connectionAlive;
 }
 
 void HTTPRequest::setHeaderMap(const std::map<std::string, std::string> &header)
@@ -293,6 +306,7 @@ void	HTTPRequest::analyzeHeader()
 	this->checkChunked();
 	if (this->_isChunked == false)
 		this->checkContentLength();
+	this->processConnection();
 }
 
 void	HTTPRequest::checkChunked()
@@ -325,6 +339,56 @@ void	HTTPRequest::checkContentLength()
 	}
 	else
 		std::cerr << "There is no content-length in the header!\n";
+}
+
+/*
+	If request is HTTP/1.1 and header is not Connection: close → keep-alive.
+	If request is HTTP/1.0 → only keep-alive when Connection: keep-alive.
+*/
+void	HTTPRequest::processConnection()
+{
+	const std::string version = this->_version;
+	const std::map<std::string, std::string> header = this->_header;
+
+	std::map<std::string, std::string>::const_iterator it = header.find("connection");
+	bool hasConnection = false;
+	if (it != header.end())
+		hasConnection = true;
+	std::string	connection = "";
+	if (hasConnection == true)
+		connection = it->second;
+	
+	// Make all words lowercase
+	for (size_t	i = 0; i < connection.size(); ++i)
+		connection[i] = std::tolower(connection[i]);
+	this->_connectionAlive = evaluateAlive(version, hasConnection, connection);
+}
+
+bool	HTTPRequest::evaluateAlive(const std::string version, const bool hasConnection, const std::string connection)
+{
+	if (version == "HTTP/1.1")
+	{
+		if (hasConnection == true)
+		{
+			if (connection.find("close") == std::string::npos)
+				return (true);
+			else
+				return (false);
+		}
+		return (true);
+	}
+	if (version == "HTTP/1.0")
+	{
+		if (hasConnection == true)
+		{
+			if (connection.find("keep-alive") != std::string::npos)
+				return (true);
+			else
+				return (false);
+		}
+		return (false);
+	}
+	return (false);
 }
 
 /*********************BODY******************************* */
@@ -436,4 +500,21 @@ const char *HTTPRequest::EmptyRawHeader::what() const throw()
 const char *HTTPRequest::ContentLengthConversionFailed::what() const throw()
 {
 	return ("Invalid Header Value: Conversion Content-Length Failed!");
+}
+
+/***************************************** Utility *************************************/
+
+/*
+	Add a connection header to your response
+
+	Extra Note:
+		You can tune timeout/max for your server
+		return ("Connection: keep-alive\r\n
+				Keep-Alive: timeout=15, max=100\r\n");
+*/
+std::string	HTTPRequest::connectionHeader(bool keep) const
+{
+	if (keep)
+		return ("Connection: keep-alive\r\n");
+	return ("Connection: close\r\n");
 }
