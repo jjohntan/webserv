@@ -79,6 +79,7 @@ class	HTTPRequest
 		HTTPRequest	&operator=(const HTTPRequest &other);
 
 		void	feed(std::string &data);
+		void	resetForNextRequest();
 
 		/* Getters */
 		const std::string &getRawString() const;

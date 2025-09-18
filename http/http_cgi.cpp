@@ -63,11 +63,17 @@ static std::string loadErrorPageBody(int code, const ServerConfig* sc)
 	return os.str();
 }
 
-static void sendError( int code, const std::string& message, int socketFD, const ServerConfig* sc )
+static void sendError( int code, const std::string& message, int socketFD, const ServerConfig* sc, const HTTPRequest* req)
 {
 	std::string body = loadErrorPageBody(code, sc);
 	std::ostringstream len; len << body.size();
-	std::string full = "Content-Type: text/html\r\nContent-Length: " + len.str() + "\r\nConnection: close\r\n\r\n" + body;
+	std::string full = "Content-Type: text/html\r\n"
+						"Content-Length: " + len.str() + "\r\n";
+	if (req)
+		full += req->connectionHeader(req->isConnectionAlive());
+	else
+		full += "Connection: close\r\n";
+	full += "\r\n" + body;
 	HTTPResponse resp(message, code, full, socketFD);
 	resp.sendResponse();
 }
@@ -325,20 +331,22 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 	}
 
 	// Static DELETE (only files, not directories)
-	if (request.getMethod() == "DELETE") {                                        // [CHANGE]
+	if (request.getMethod() == "DELETE") {
 		struct stat st;
 		if (stat(filePath.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
 			if (std::remove(filePath.c_str()) == 0) {
-				std::string content = "Content-Length: 0\r\nConnection: close\r\n\r\n";
+				std::string content = "Content-Length: 0\r\n"
+										+ request.connectionHeader(request.isConnectionAlive())
+										+ "\r\n";
 				HTTPResponse resp("No Content", 204, content, socketFD);
 				resp.sendResponse();
-			} else {
-				sendError(403, "Forbidden", socketFD, server_config);
 			}
-		} else {
-			sendError(404, "Not Found", socketFD, server_config);
+			else
+				sendError(403, "Forbidden", socketFD, server_config, &request);
 		}
-		return;
+		else
+			sendError(404, "Not Found", socketFD, server_config, &request);
+		return ;
 	}
 
 	// Directory request → autoindex or 403
@@ -347,20 +355,22 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 		if (autoindex_enabled) {
 			std::string dirListing = generateDirectoryListing(filePath);
 			std::ostringstream contentLengthStream; contentLengthStream << dirListing.length();
-			std::string responseContent = "Content-Type: text/html\r\nContent-Length: "
-											+ contentLengthStream.str() + "\r\n\r\n" + dirListing;
+			std::string responseContent = "Content-Type: text/html\r\n"
+											"Content-Length: " + contentLengthStream.str() + "\r\n"
+											+ request.connectionHeader(request.isConnectionAlive()) + "\r\n"
+											+ dirListing;
 			HTTPResponse response("OK", 200, responseContent, socketFD);
 			response.sendResponse();
-		} else {
-			sendError(403, "Forbidden", socketFD, server_config);                 // [CHANGE]
 		}
+		else
+			sendError(403, "Forbidden", socketFD, server_config, &request);
 		return;
 	}
 
 	// Regular file
 	std::string content = serveFile(filePath);
 	if (content.empty()) {
-		sendError(404, "Not Found", socketFD, server_config);                     // [CHANGE]
+		sendError(404, "Not Found", socketFD, server_config, &request);
 		return;
 	}
 
@@ -372,8 +382,10 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 	else if (filePath.find(".png") != std::string::npos) contentType = "image/png";
 
 	std::ostringstream contentLengthStream; contentLengthStream << content.length();
-	std::string responseContent = "Content-Type: " + contentType + "\r\nContent-Length: "
-									+ contentLengthStream.str() + "\r\n\r\n" + content;
+	std::string responseContent = "Content-Type: " + contentType + "\r\n"
+									"Content-Length: " + contentLengthStream.str() + "\r\n"
+									+ request.connectionHeader(request.isConnectionAlive()) + "\r\n"
+									+ content;
 	HTTPResponse response("OK", 200, responseContent, socketFD);
 	response.sendResponse();
 	}

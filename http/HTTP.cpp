@@ -75,7 +75,8 @@ bool	checkAllowedMethod(const HTTPRequest &request, int socketFD, const std::vec
 			allow << matching_location->allowed_methods[i];
 		}
 		// RFC requires Allow header for 405
-		const std::string extra = "Allow: " + allow.str() + "\r\n";
+		std::string extra = "Allow: " + allow.str() + "\r\n";
+		extra += request.connectionHeader(request.isConnectionAlive());
 
 		ErrorResponse resp(405, "Method Not Allowed",
 							*active,
@@ -100,7 +101,9 @@ bool	checkPayLoad(const HTTPRequest &request, int socketFD, const std::vector<Se
 		const std::vector<char>&body = request.getBodyVector();
 		if (body.size() > active->client_max_body_size)
 		{
-			ErrorResponse resp(413, "Payload Too Large", *active, socketFD);
+			// Provide Connection header matching keep-alive decision
+			std::string extra = request.connectionHeader(request.isConnectionAlive());
+			ErrorResponse resp(413, "Payload Too Large", *active, extra, socketFD);
 			resp.sendResponse();
 			return (true);
 		}
@@ -165,7 +168,7 @@ bool	checkRedirectResponse(const HTTPRequest &request, int socketFD, const std::
 		out << "Location: " << url << "\r\n"
 			<< "Content-Type: text/html\r\n"
 			<< "Content-Length: " << body.size() << "\r\n"
-			<< "Connection: close\r\n"
+			<< request.connectionHeader(request.isConnectionAlive())
 			<< "\r\n";
 		if (include_body)
 			out << body;
@@ -236,16 +239,35 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 			std::cout << "Request From Socket " << socketFD << "had successfully converted into object!\n";
 			printRequest(requestMap[socketFD]);
 
+			// These helpers will send a response themselves if they trigger.
+			// We only close if the connection is *not* keep-alive.
 			if (checkAllowedMethod(requestMap[socketFD], socketFD, servers))
-				return (true);
+			{
+				bool closeIt = !requestMap[socketFD].isConnectionAlive();
+				if (!closeIt) requestMap[socketFD].resetForNextRequest();
+				return (closeIt);
+			}
 			if (checkPayLoad(requestMap[socketFD], socketFD, servers))
-				return (true);
+			{
+				bool closeIt = !requestMap[socketFD].isConnectionAlive();
+				if (!closeIt) requestMap[socketFD].resetForNextRequest();
+				return (closeIt);
+			}
 			if (checkRedirectResponse(requestMap[socketFD], socketFD, servers))
-				return (true);
+			{
+				bool closeIt = !requestMap[socketFD].isConnectionAlive();
+				if (!closeIt) requestMap[socketFD].resetForNextRequest();
+				return (closeIt);
+			}
 			
 			// Call the main CGI and file serving function
 			handleRequestProcessing(requestMap[socketFD], socketFD, servers);
-			return (true);
+			// After we send a normal response, decide to close or keep.
+			{
+				bool closeIt = !requestMap[socketFD].isConnectionAlive();
+				if (!closeIt) requestMap[socketFD].resetForNextRequest();
+				return (closeIt);
+			}
 		}
 		return (false); // so that clearing not happen
 	}
@@ -276,6 +298,6 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 			HTTPResponse err("Bad Request", 400, out.str(), socketFD);
 			err.sendResponse();
 		}
-		return (true);
+		return (true); // on parser error, close is OK/safer
 	}
 }

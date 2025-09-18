@@ -518,3 +518,30 @@ std::string	HTTPRequest::connectionHeader(bool keep) const
 		return ("Connection: keep-alive\r\n");
 	return ("Connection: close\r\n");
 }
+
+/*
+	Reset internal state so the same TCP connection can accept another request
+
+	NOTE: _connectionAlive remains whatever was decided for the *just served* request.
+	It will be recomputed on the next request's headers.
+*/
+void HTTPRequest::resetForNextRequest()
+{
+	_rawString.clear();
+	_rawHeader.clear();
+	_rawBody.clear();
+	_header.clear();
+	_body.clear();
+	_headerComplete = false;
+	_bodyComplete = false;
+	_isChunked = false;
+	_chunkedComplete = false;
+	_bodyPos = 0;
+	_chunkSize = 0;
+	_content_length = 0;
+	_request_line.clear();
+	_request_line_len = 0;
+	_method.clear();
+	_path.clear();
+	_version.clear();
+}
