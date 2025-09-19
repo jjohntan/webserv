@@ -1,4 +1,4 @@
-#include "Server.hpp"
+#include "server/Server.hpp"
 #include "config_files/config.hpp"
 #include <iostream>
 #include <cstring>
