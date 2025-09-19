@@ -1,0 +1,24 @@
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+
+{	"transactions":			       15699,
+	"availability":			       99.97,
+	"elapsed_time":			      112.22,
+	"data_transferred":		      191.82,
+	"response_time":		        0.09,
+	"transaction_rate":		      139.89,
+	"throughput":			        1.71,
+	"concurrency":			       13.27,
+	"successful_transactions":	       15699,
+	"failed_transactions":		           5,
+	"longest_transaction":		       11.47,
+	"shortest_transaction":		        0.04
+}

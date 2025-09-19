@@ -16,6 +16,7 @@
 CGIResult runCGI(const HTTPRequest& request, const std::string& script_path, const std::map<std::string, std::string>& cgi_extensions, const std::string& working_directory);
 std::string serveFile(const std::string& filePath);
 std::string generateDirectoryListing(const std::string& dirPath);
+void handleFileUpload(const HTTPRequest& request, const Location* location, int socketFD, const ServerConfig* server_config);
 
 // Server configuration helper functions
 const ServerConfig* findServerConfig(const HTTPRequest& request, const std::vector<ServerConfig>& servers);

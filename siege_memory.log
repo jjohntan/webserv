@@ -1,0 +1,36 @@
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+[[1;32malert[0m] socket: select and discovered it's not ready sock.c:384: Connection timed out
+[[1;32malert[0m] socket: read check timed out(30) sock.c:273: Connection timed out
+
+{	"transactions":			       10394,
+	"availability":			       99.89,
+	"elapsed_time":			       64.51,
+	"data_transferred":		      127.01,
+	"response_time":		        0.08,
+	"transaction_rate":		      161.12,
+	"throughput":			        1.97,
+	"concurrency":			       13.55,
+	"successful_transactions":	       10394,
+	"failed_transactions":		          11,
+	"longest_transaction":		       31.90,
+	"shortest_transaction":		        0.00
+}

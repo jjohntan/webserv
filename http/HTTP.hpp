@@ -20,10 +20,10 @@
 # include <map>
 # include <string>
 
-const ServerConfig* getActiveServer(const std::vector<ServerConfig>& serverConfig);
-const Location* getMatchingLocation(const std::string& path,
-									const std::vector<ServerConfig>& serverConfig);
 
+// const ServerConfig* getActiveServer(const std::vector<ServerConfig>& serverConfig);
+// const Location* getMatchingLocation(const std::string& path,
+//                                     const std::vector<ServerConfig>& serverConfig);
 const	Location* getMatchingLocation(const std::string &path, const ServerConfig* servercConfig);
 bool	methodAllowed(const HTTPRequest &request, const Location *Location);
 bool	checkAllowedMethod(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig);

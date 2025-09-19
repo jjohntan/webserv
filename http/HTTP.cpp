@@ -7,17 +7,36 @@
 #include <sys/socket.h>  // recv
 #include <sstream>
 
-const ServerConfig* getActiveServer(const std::vector<ServerConfig>& serverConfig)
-{
-	if (serverConfig.empty())
-		return (NULL);
-	return (&serverConfig[0]);
-}
+// Original getActiveServer function (commented out - always returned first server)
+// const ServerConfig* getActiveServer(const std::vector<ServerConfig>& serverConfig)
+// {
+//     if (serverConfig.empty())
+//         return (NULL);
+//     return (&serverConfig[0]);  // Always returns the FIRST server config
+// }
 
-const Location* getMatchingLocation(const std::string& path,
-									const std::vector<ServerConfig>& serverConfig)
-{
-	return (getMatchingLocation(path, getActiveServer(serverConfig)));
+// New function to find server by port from Host header
+const ServerConfig* findServerByPort(const HTTPRequest& request, const std::vector<ServerConfig>& servers) {
+    const std::map<std::string, std::string>& headers = request.getHeaderMap();
+    std::map<std::string, std::string>::const_iterator host_it = headers.find("host");
+    std::string host = (host_it != headers.end()) ? host_it->second : "";
+    
+    // Extract port from host header (e.g., "localhost:8081" -> "8081")
+    size_t colon_pos = host.find(':');
+    std::string port_str = (colon_pos != std::string::npos) ? host.substr(colon_pos + 1) : "80";
+    
+    // Convert port string to int
+    int port = atoi(port_str.c_str());
+    
+    // Find matching server configuration
+    for (size_t i = 0; i < servers.size(); ++i) {
+        if (servers[i].port == port) {
+            return &servers[i];
+        }
+    }
+    
+    // Fallback to first server if no match found
+    return &servers[0];
 }
 
 const	Location* getMatchingLocation(const std::string &path, const ServerConfig* servercConfig)
@@ -55,7 +74,7 @@ bool	methodAllowed(const HTTPRequest &request, const Location *Location)
 
 bool	checkAllowedMethod(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig)
 {
-	const ServerConfig *active = getActiveServer(serverConfig);
+	const ServerConfig *active = findServerByPort(request, serverConfig);
 	if (!active) 
 		return (false);
 
@@ -92,7 +111,7 @@ bool	checkAllowedMethod(const HTTPRequest &request, int socketFD, const std::vec
 */
 bool	checkPayLoad(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig)
 {
-	const ServerConfig *active = getActiveServer(serverConfig);
+	const ServerConfig *active = findServerByPort(request, serverConfig);
 	if (!active)
 		return (false);
 	if (active->client_max_body_size > 0)
@@ -135,7 +154,7 @@ const char* reasonPhrase(int code)
 */
 bool	checkRedirectResponse(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig)
 {
-	const ServerConfig* active = getActiveServer(serverConfig);
+	const ServerConfig* active = findServerByPort(request, serverConfig);
 	if (!active)
 		return (false);
 	std::string	path = request.getPath();
@@ -254,7 +273,7 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 		std::cerr << "Error while processing client data from socket "
 					<< socketFD << ": " << e.what() << "\n";
 
-		const ServerConfig* active = getActiveServer(servers);
+		const ServerConfig* active = findServerByPort(requestMap[socketFD], servers);
 		if (active)
 		{
 			// Use your ErrorResponse: resolves error_pages[400] under sc->root

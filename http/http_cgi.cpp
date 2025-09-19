@@ -4,6 +4,9 @@
 #include <dirent.h>
 #include <sstream>
 #include <iostream>
+#include <sys/stat.h>
+#include <cstdlib>
+#include <ctime>
 
 // Enforce allowed_methods, redirects, error pages, 413 limit, and static DELETE
 // add near top of file (helpers)
@@ -22,14 +25,14 @@ static const Location* getMatchingLocation(const std::string& path, const Server
 	return best;
 }
 
-// static bool methodAllowed(const HTTPRequest& req, const Location* L)
-// {
-// 	if (!L || L->allowed_methods.empty()) return true; // default allow if not configured
-// 	for (size_t i = 0; i < L->allowed_methods.size(); ++i) {
-// 		if (req.getMethod() == L->allowed_methods[i]) return true;
-// 	}
-// 	return false;
-// }
+static bool methodAllowed(const HTTPRequest& req, const Location* L)
+{
+	if (!L || L->allowed_methods.empty()) return true; // default allow if not configured
+	for (size_t i = 0; i < L->allowed_methods.size(); ++i) {
+		if (req.getMethod() == L->allowed_methods[i]) return true;
+	}
+	return false;
+}
 
 // Try to load configured error page; if not found, fall back to simple body
 static std::string loadErrorPageBody(int code, const ServerConfig* sc)
@@ -226,6 +229,76 @@ std::map<std::string, std::string> getCGIExtensions(const std::string& path, con
 	return cgi_extensions;
 }
 
+// Handle file uploads (non-CGI)
+void handleFileUpload(const HTTPRequest& request, const Location* location, int socketFD, const ServerConfig* server_config) {
+	const std::vector<char>& body = request.getBodyVector();
+	if (body.empty()) {
+		sendError(400, "Bad Request", socketFD, server_config);
+		return;
+	}
+
+	// Get content type to determine if it's multipart/form-data
+	const std::map<std::string, std::string>& headers = request.getHeaderMap();
+	std::map<std::string, std::string>::const_iterator ct_it = headers.find("content-type");
+	std::string content_type = (ct_it != headers.end()) ? ct_it->second : "";
+
+	// Simple file upload - save raw body to upload directory
+	std::string upload_dir = location->upload_path;
+	
+	// Create upload directory if it doesn't exist
+	struct stat st;
+	if (stat(upload_dir.c_str(), &st) != 0) {
+		// Create directory with 755 permissions
+		if (mkdir(upload_dir.c_str(), 0755) != 0) {
+			sendError(500, "Internal Server Error", socketFD, server_config);
+			return;
+		}
+	}
+
+	// Generate unique filename
+	std::ostringstream filename_stream;
+	filename_stream << "upload_" << time(NULL) << "_" << rand() % 10000;
+	
+	// Try to determine file extension from content type
+	std::string extension = "";
+	if (content_type.find("image/jpeg") != std::string::npos) extension = ".jpg";
+	else if (content_type.find("image/png") != std::string::npos) extension = ".png";
+	else if (content_type.find("text/plain") != std::string::npos) extension = ".txt";
+	else if (content_type.find("application/pdf") != std::string::npos) extension = ".pdf";
+	
+	std::string filename = filename_stream.str() + extension;
+	std::string filepath = upload_dir + "/" + filename;
+
+	// Write file
+	std::ofstream file(filepath.c_str(), std::ios::binary);
+	if (!file.is_open()) {
+		sendError(500, "Internal Server Error", socketFD, server_config);
+		return;
+	}
+
+	file.write(&body[0], body.size());
+	file.close();
+
+	// Set file permissions
+	chmod(filepath.c_str(), 0644);
+
+	// Send success response
+	std::ostringstream response_body;
+	response_body << "<html><head><title>Upload Successful</title></head><body>";
+	response_body << "<h1>File Upload Successful</h1>";
+	response_body << "<p><strong>Filename:</strong> " << filename << "</p>";
+	response_body << "<p><strong>Size:</strong> " << body.size() << " bytes</p>";
+	response_body << "<p><strong>Upload Directory:</strong> " << upload_dir << "</p>";
+	response_body << "<p><a href=\"/upload/\">View Upload Directory</a></p>";
+	response_body << "</body></html>";
+
+	std::string body_str = response_body.str();
+	std::ostringstream len; len << body_str.size();
+	std::string content = "Content-Type: text/html\r\nContent-Length: " + len.str() + "\r\nConnection: close\r\n\r\n" + body_str;
+	HTTPResponse resp("Created", 201, content, socketFD);
+	resp.sendResponse();
+}
+
 // Main function to handle CGI checking and file serving
 void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std::vector<ServerConfig>& servers)
 {
@@ -237,23 +310,23 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 	// Pick the most specific location once
 	const Location* matching_location = getMatchingLocation(path, server_config); // [CHANGE]
 
-	// // 405 Method Not Allowed (with Allow:)
-	// if (matching_location && !methodAllowed(request, matching_location)) {        // [CHANGE]
-	// 	std::ostringstream allow;
-	// 	for (size_t i = 0; i < matching_location->allowed_methods.size(); ++i) {
-	// 		if (i) allow << ", ";
-	// 		allow << matching_location->allowed_methods[i];
-	// 	}
-	// 	std::string body = loadErrorPageBody(405, server_config);
-	// 	std::ostringstream len; len << body.size();
-	// 	std::string content = "Allow: " + allow.str() + "\r\n"
-	// 							"Content-Type: text/html\r\n"
-	// 							"Content-Length: " + len.str() + "\r\n"
-	// 							"Connection: close\r\n\r\n" + body;
-	// 	HTTPResponse resp("Method Not Allowed", 405, content, socketFD);
-	// 	resp.sendResponse();
-	// 	return;
-	// }
+	// 405 Method Not Allowed (with Allow:)
+	if (matching_location && !methodAllowed(request, matching_location)) {        // [CHANGE]
+		std::ostringstream allow;
+		for (size_t i = 0; i < matching_location->allowed_methods.size(); ++i) {
+			if (i) allow << ", ";
+			allow << matching_location->allowed_methods[i];
+		}
+		std::string body = loadErrorPageBody(405, server_config);
+		std::ostringstream len; len << body.size();
+		std::string content = "Allow: " + allow.str() + "\r\n"
+								"Content-Type: text/html\r\n"
+								"Content-Length: " + len.str() + "\r\n"
+								"Connection: close\r\n\r\n" + body;
+		HTTPResponse resp("Method Not Allowed", 405, content, socketFD);
+		resp.sendResponse();
+		return;
+	}
 
 	// // 413 Payload Too Large (client_max_body_size enforcement)
 	// if (server_config && server_config->client_max_body_size > 0) {               // [CHANGE]
@@ -322,6 +395,21 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 		filePath = server_root + "/" + indexName;
 	} else {
 		filePath = server_root + path;
+	}
+
+	// Handle POST requests for file uploads (non-CGI) - must be before directory handling
+	if (request.getMethod() == "POST") {
+		std::cout << "[DEBUG] POST request to path: " << path << std::endl;
+		if (matching_location) {
+			std::cout << "[DEBUG] Matching location found, upload_path: '" << matching_location->upload_path << "'" << std::endl;
+		} else {
+			std::cout << "[DEBUG] No matching location found" << std::endl;
+		}
+		if (matching_location && !matching_location->upload_path.empty()) {
+			std::cout << "[DEBUG] Calling handleFileUpload" << std::endl;
+			handleFileUpload(request, matching_location, socketFD, server_config);
+			return;
+		}
 	}
 
 	// Static DELETE (only files, not directories)
