@@ -28,14 +28,16 @@ class	HTTPResponse
 		std::string	_completeRawResponse;
 
 		std::string	_content; // body & header
+		std::string	_header;
 		std::string	_body; // body only
+		size_t		_bodyLen;
 		int	_socketFD;
 
 		HTTPResponse();
 	public:
 		HTTPResponse(std::string statusLine, std::string content, int socketFD); // normal response
 		HTTPResponse( std::string statusMessage, int statusCode, std::string content, int socketFD);
-		HTTPResponse(std::string status, int errorCode); // default content error
+		HTTPResponse(std::string status, int errorCode, bool keep); // default content error
 		HTTPResponse(std::string status, int errorCode, std::string	content);
 		virtual ~HTTPResponse();
 		HTTPResponse(const HTTPResponse &other);
@@ -43,7 +45,11 @@ class	HTTPResponse
 
 		// void	processHTTPResponse();
 		void	sendResponse() const;
-		
+		/* Header + Body */
+		void	separateHeaderBody();
+		void	countBodyLen();
+		void	ensureContentLength();
+
 		/* Status Line */
 		void	convertStatusLine();
 		void	extractStatusCodeAndMessage();
@@ -54,7 +60,7 @@ class	HTTPResponse
 
 		/* Simple Error Page Generation */
 		std::string generateErrorHTML(int code, const std::string &message);
-		std::string buildErrorResponse();
+		std::string buildErrorResponse(bool keep);
 
 		/* Utility */
 		void	trimBackslashR(std::string &line);
@@ -67,6 +73,7 @@ class	HTTPResponse
 		const std::string	&getRawResponse() const;
 		const std::string	&getStatusMessage() const;
 		int					getStatusCode() const;
+		int					getBodyLen() const;
 
 		/* Setters */
 		void	setStatusLine(const std::string &statusLine);
@@ -74,6 +81,7 @@ class	HTTPResponse
 		void	setSocketFD(const int	socketFD);
 		void	setStatusCode(const int statusCode);
 		void	setStatusMessage(const std::string statusMessage);
+
 };
 
 #endif
