@@ -32,6 +32,7 @@ class	HTTPResponse
 		std::string	_body; // body only
 		size_t		_bodyLen;
 		int	_socketFD;
+		size_t _bytesSent;
 
 		HTTPResponse();
 	public:
@@ -44,7 +45,7 @@ class	HTTPResponse
 		HTTPResponse	&operator=(const HTTPResponse &other);
 
 		// void	processHTTPResponse();
-		void	sendResponse() const;
+		bool	sendResponse();
 		/* Header + Body */
 		void	separateHeaderBody();
 		void	countBodyLen();
@@ -74,6 +75,7 @@ class	HTTPResponse
 		const std::string	&getStatusMessage() const;
 		int					getStatusCode() const;
 		int					getBodyLen() const;
+		size_t				getByteSent() const;
 
 		/* Setters */
 		void	setStatusLine(const std::string &statusLine);

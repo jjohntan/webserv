@@ -6,7 +6,8 @@ HTTPResponse::HTTPResponse(std::string statusLine, std::string content, int sock
 	_statusLine(statusLine),
 	_statusCode(0),
 	_content(content),
-	_socketFD(socketFD)
+	_socketFD(socketFD),
+	_bytesSent(0)
 {
 	if (!_content.empty())
 		this->separateHeaderBody();
@@ -146,6 +147,11 @@ int	HTTPResponse::getBodyLen() const
 	return (static_cast<int>(this->_bodyLen));
 }
 
+size_t	HTTPResponse::getByteSent() const
+{
+	return (this->_bytesSent);
+}
+
 /****************************SETTERS***************************** */
 
 void	HTTPResponse::setStatusLine(const std::string &statusLine)
@@ -180,22 +186,34 @@ void	HTTPResponse::setStatusMessage(const std::string statusMessage)
 // 	this->addStatusLineToContent();
 // }
 
-void	HTTPResponse::sendResponse() const
+bool	HTTPResponse::sendResponse()
 {
 	const std::string &response = this->_completeRawResponse;
-	ssize_t total_sent = 0;
-	ssize_t response_size = response.size();
+	// ssize_t total_sent = 0;
+	// ssize_t response_size = response.size();
 
-	while (total_sent < response_size)
+	// while (total_sent < response_size)
+	// {
+	// 	ssize_t sent = send(_socketFD, response.c_str() + total_sent, response_size - total_sent, 0);
+	// 	if (sent == -1)
+	// 	{
+	// 		std::cerr << "Failed to send response to socket FD " << _socketFD << std::endl;
+	// 		break;
+	// 	}
+	// 	total_sent += sent;
+	// }
+	if (_bytesSent >= response.size())
 	{
-		ssize_t sent = send(_socketFD, response.c_str() + total_sent, response_size - total_sent, 0);
-		if (sent == -1)
-		{
-			std::cerr << "Failed to send response to socket FD " << _socketFD << std::endl;
-			break;
-		}
-		total_sent += sent;
+		return true;
 	}
+	ssize_t sent = send(_socketFD, response.c_str() + _bytesSent, response.size() - _bytesSent, 0);
+
+	if (sent <= 0)
+	{
+		return false;
+	}
+	_bytesSent += sent;
+	return _bytesSent == response.size();
 }
 /************************ STATUS LINE ***************** */
 
