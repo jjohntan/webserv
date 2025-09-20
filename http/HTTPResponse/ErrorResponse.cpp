@@ -86,7 +86,6 @@ std::string	ErrorResponse::makeHeaderBody(const std::string &filePath, int statu
 	
 	std::ostringstream	out;
 	out << "Content-Type: text/html\r\n"
-		<< "Content-Length: " << body.size() << "\r\n"
 		<< "Connection: close\r\n"
 		<< "\r\n"
 		<< body;
@@ -104,8 +103,7 @@ std::string	ErrorResponse::makeHeaderBody(const std::string &filePath, int statu
 	if (!extraHeaders.empty())
 		out << extraHeaders;
 	
-	out << "Content-Type: text/html\r\n"
-		<< "Content-Length: " << body.size() << "\r\n";
+	out << "Content-Type: text/html\r\n";
 
 	if (!hasConnectionHeader(extraHeaders))
 		out << "Connection: close\r\n";

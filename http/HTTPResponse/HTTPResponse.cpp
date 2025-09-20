@@ -293,26 +293,28 @@ void	HTTPResponse::addStatusLineToContent()
 
 void HTTPResponse::ensureContentLength()
 {
-	// Only add if body exists
-	if (_body.empty())
-		return;
+	// If there is no body, do nothing (e.g., 204/HEAD/no-body responses)
+	if (_body.empty()) return;
 
-	// Case-insensitive search for "Content-Length"
-	std::string headerLower = _header;
-	for (size_t i = 0; i < headerLower.size(); ++i)
-		headerLower[i] = std::tolower(static_cast<unsigned char>(headerLower[i]));
-
-	if (headerLower.find("content-length:") == std::string::npos)
+	// Rebuild header without any existing Content-Length (case-insensitive),
+	// then append the correct one computed from _body.size().
+	std::istringstream hs(_header);
+	std::ostringstream newHeader;
+	std::string line;
+	while (std::getline(hs, line))
 	{
-		std::ostringstream stream;
-		stream << "Content-Length: " << _body.size() << "\r\n";
-
-		// Append to header
-		_header += "\r\n" + stream.str();
-
-		// Rebuild _content with header + CRLF + body
-		_content = _header + "\r\n" + _body;
+		// keep CR stripping logic consistent with separateHeaderBody()
+		if (!line.empty() && line[line.size() - 1] == '\r') line.erase(line.size() - 1, 1);
+		std::string lower = line;
+		for (size_t i = 0; i < lower.size(); ++i)
+			lower[i] = std::tolower(static_cast<unsigned char>(lower[i]));
+		if (lower.rfind("content-length:", 0) != 0)   // keep all but Content-Length
+			newHeader << line << "\r\n";
 	}
+	newHeader << "Content-Length: " << _body.size() << "\r\n";
+
+	_header = newHeader.str();
+	_content = _header + "\r\n" + _body;
 }
 
 /***************************** ERROR PAGES GENERATION ******************* */
@@ -331,13 +333,12 @@ std::string HTTPResponse::buildErrorResponse(bool keep)
 {
 	this->_body = generateErrorHTML(_statusCode, _statusMessage);
 	std::ostringstream stream;
-	stream << this->_formatedStatus
-			<< "Content-Type: text/html\r\n"
-			<< "Content-Length: " << _body.size() << "\r\n"
+	// No status line here; addStatusLineToContent() will prepend it.
+	stream << "Content-Type: text/html\r\n"
 			<< (keep ? "Connection: keep-alive\r\n" : "Connection: close\r\n")
 			<< "\r\n"
 			<< this->_body;
-	return (stream.str());
+	return stream.str();
 }
 
 /******************** UTILITY***************************** */

@@ -167,7 +167,6 @@ bool	checkRedirectResponse(const HTTPRequest &request, int socketFD, const std::
 		std::ostringstream out;
 		out << "Location: " << url << "\r\n"
 			<< "Content-Type: text/html\r\n"
-			<< "Content-Length: " << body.size() << "\r\n"
 			<< request.connectionHeader(request.isConnectionAlive())
 			<< "\r\n";
 		if (include_body)
@@ -292,7 +291,6 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 				"<h1>400 Bad Request</h1></body></html>";
 			std::ostringstream out;
 			out << "Content-Type: text/html\r\n"
-				<< "Content-Length: " << body.size() << "\r\n"
 				<< "Connection: close\r\n\r\n"
 				<< body;
 			HTTPResponse err("Bad Request", 400, out.str(), socketFD);
