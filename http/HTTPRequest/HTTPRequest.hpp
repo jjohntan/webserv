@@ -80,6 +80,7 @@ class	HTTPRequest
 
 		void	feed(std::string &data);
 		void	resetForNextRequest();
+		size_t	endOfMessageOffset() const;
 
 		/* Getters */
 		const std::string &getRawString() const;

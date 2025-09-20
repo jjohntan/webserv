@@ -41,7 +41,8 @@ curl -v --http1.1 -X DELETE http://127.0.0.1:8080/some-file -o /dev/null -D -
 2) Single-socket test (prove two requests on ONE TCP connection)
 	One-shot (two requests, one connection)
 		printf 'GET /index.html HTTP/1.1\r\nHost: 127.0.0.1:8080\r\n\r\nGET /about.html HTTP/1.1\r\nHost: 127.0.0.1:8080\r\n\r\n' \
-		| nc 127.0.0.1 8080
+		| nc -v -C 127.0.0.1 8080
+
 
 	You should see two full responses back-to-back.
 

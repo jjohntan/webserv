@@ -223,52 +223,62 @@ void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::v
 	
 }
 
+/*
+	HTTP/1.1 pipelining	
+	client sends multiple requests back-to-back on the same TCP connection without waiting for the previous response	
+*/
 
 bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::string	data, const std::vector<ServerConfig>& servers)
 {
 	try
 	{
-		// Feed data to HTTPRequest
-		requestMap[socketFD].feed(data);
+		HTTPRequest& req = requestMap[socketFD];
+		req.feed(data);
 
-		// Check whether HTTPRequest has complete data
-		if (requestMap[socketFD].isHeaderComplete() == true && requestMap[socketFD].isBodyComplete() == true)
+		// Process as many pipelined requests as are fully buffered
+		while (req.isHeaderComplete() && req.isBodyComplete())
 		{
-			// Print Debug Message
-			std::cout << "Request From Socket " << socketFD << "had successfully converted into object!\n";
-			printRequest(requestMap[socketFD]);
+			std::cout << "Request From Socket " << socketFD << " had successfully converted into object!\n";
+			printRequest(req);
 
-			// These helpers will send a response themselves if they trigger.
-			// We only close if the connection is *not* keep-alive.
-			if (checkAllowedMethod(requestMap[socketFD], socketFD, servers))
+			if (checkAllowedMethod(req, socketFD, servers) ||
+				checkPayLoad(req, socketFD, servers) ||
+				checkRedirectResponse(req, socketFD, servers))
 			{
-				bool closeIt = !requestMap[socketFD].isConnectionAlive();
-				if (!closeIt) requestMap[socketFD].resetForNextRequest();
-				return (closeIt);
+				bool closeIt = !req.isConnectionAlive();
+				if (closeIt)
+					return (true);
+
+				// keep remainder (if any), then reset and re-feed it
+				size_t used = req.endOfMessageOffset();
+				std::string tail = req.getRawString().substr(used); // get the content of next pipeline request
+				req.resetForNextRequest();
+				if (!tail.empty())
+				{
+					req.feed(tail);
+					continue; // loop for next buffered request
+				}
+				return (false);
 			}
-			if (checkPayLoad(requestMap[socketFD], socketFD, servers))
+
+			// normal response path
+			handleRequestProcessing(req, socketFD, servers);
+			bool closeIt = !req.isConnectionAlive();
+			if (closeIt) 
+				return (true);
+
+			// keep remainder (if any), then reset and re-feed it
+			size_t used = req.endOfMessageOffset();
+			std::string tail = req.getRawString().substr(used);
+			req.resetForNextRequest();
+			if (!tail.empty())
 			{
-				bool closeIt = !requestMap[socketFD].isConnectionAlive();
-				if (!closeIt) requestMap[socketFD].resetForNextRequest();
-				return (closeIt);
+				req.feed(tail);
+				continue; // process next pipelined request
 			}
-			if (checkRedirectResponse(requestMap[socketFD], socketFD, servers))
-			{
-				bool closeIt = !requestMap[socketFD].isConnectionAlive();
-				if (!closeIt) requestMap[socketFD].resetForNextRequest();
-				return (closeIt);
-			}
-			
-			// Call the main CGI and file serving function
-			handleRequestProcessing(requestMap[socketFD], socketFD, servers);
-			// After we send a normal response, decide to close or keep.
-			{
-				bool closeIt = !requestMap[socketFD].isConnectionAlive();
-				if (!closeIt) requestMap[socketFD].resetForNextRequest();
-				return (closeIt);
-			}
+			return (false);
 		}
-		return (false); // so that clearing not happen
+		return (false); // need more bytes for next request
 	}
 	catch (const std::exception &e)
 	{
