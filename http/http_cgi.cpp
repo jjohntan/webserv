@@ -67,8 +67,7 @@ static void sendError( int code, const std::string& message, int socketFD, const
 {
 	std::string body = loadErrorPageBody(code, sc);
 	std::ostringstream len; len << body.size();
-	std::string full = "Content-Type: text/html\r\n"
-						"Content-Length: " + len.str() + "\r\n";
+	std::string full = "Content-Type: text/html\r\n";
 	if (req)
 		full += req->connectionHeader(req->isConnectionAlive());
 	else
@@ -243,51 +242,6 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 	// Pick the most specific location once
 	const Location* matching_location = getMatchingLocation(path, server_config); // [CHANGE]
 
-	// // 405 Method Not Allowed (with Allow:)
-	// if (matching_location && !methodAllowed(request, matching_location)) {        // [CHANGE]
-	// 	std::ostringstream allow;
-	// 	for (size_t i = 0; i < matching_location->allowed_methods.size(); ++i) {
-	// 		if (i) allow << ", ";
-	// 		allow << matching_location->allowed_methods[i];
-	// 	}
-	// 	std::string body = loadErrorPageBody(405, server_config);
-	// 	std::ostringstream len; len << body.size();
-	// 	std::string content = "Allow: " + allow.str() + "\r\n"
-	// 							"Content-Type: text/html\r\n"
-	// 							"Content-Length: " + len.str() + "\r\n"
-	// 							"Connection: close\r\n\r\n" + body;
-	// 	HTTPResponse resp("Method Not Allowed", 405, content, socketFD);
-	// 	resp.sendResponse();
-	// 	return;
-	// }
-
-	// // 413 Payload Too Large (client_max_body_size enforcement)
-	// if (server_config && server_config->client_max_body_size > 0) {               // [CHANGE]
-	// 	const std::vector<char>& b = request.getBodyVector();                     // (provided by HTTPRequest)
-	// 	if (!b.empty() && b.size() > server_config->client_max_body_size) {
-	// 		sendError(413, "Payload Too Large", socketFD, server_config);
-	// 		return;
-	// 	}
-	// }
-
-	// // 3xx redirect if configured in location
-	// if (matching_location && matching_location->redirect_code > 0                // [CHANGE]
-	// 	&& !matching_location->redirect_url.empty()) {
-	// 	std::string body = "<html><body><h1>Redirect</h1><a href=\"" +
-	// 						matching_location->redirect_url + "\">" +
-	// 						matching_location->redirect_url + "</a></body></html>";
-	// 	std::ostringstream len; len << body.size();
-	// 	std::ostringstream hdr;
-	// 	hdr << "Location: " << matching_location->redirect_url << "\r\n"
-	// 		<< "Content-Type: text/html\r\n"
-	// 		<< "Content-Length: " << len.str() << "\r\n"
-	// 		<< "Connection: close\r\n\r\n"
-	// 		<< body;
-	// 	HTTPResponse resp("Found", matching_location->redirect_code, hdr.str(), socketFD);
-	// 	resp.sendResponse();
-	// 	return;
-	// }
-
 	// Decide CGI vs Static
 	bool cgi_enabled = isCGIEnabled(path, server_config);
 	if (cgi_enabled) {
@@ -335,9 +289,7 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 		struct stat st;
 		if (stat(filePath.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
 			if (std::remove(filePath.c_str()) == 0) {
-				std::string content = "Content-Length: 0\r\n"
-										+ request.connectionHeader(request.isConnectionAlive())
-										+ "\r\n";
+				std::string content = request.connectionHeader(request.isConnectionAlive()) + "\r\n";
 				HTTPResponse resp("No Content", 204, content, socketFD);
 				resp.sendResponse();
 			}
@@ -356,9 +308,8 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 			std::string dirListing = generateDirectoryListing(filePath);
 			std::ostringstream contentLengthStream; contentLengthStream << dirListing.length();
 			std::string responseContent = "Content-Type: text/html\r\n"
-											"Content-Length: " + contentLengthStream.str() + "\r\n"
-											+ request.connectionHeader(request.isConnectionAlive()) + "\r\n"
-											+ dirListing;
+										+ request.connectionHeader(request.isConnectionAlive()) + "\r\n"
+										+ dirListing;
 			HTTPResponse response("OK", 200, responseContent, socketFD);
 			response.sendResponse();
 		}
@@ -374,7 +325,7 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 		return;
 	}
 
-	// Content-Type (basic)
+	// Static Files
 	std::string contentType = "text/html";
 	if (filePath.find(".css") != std::string::npos) contentType = "text/css";
 	else if (filePath.find(".js")  != std::string::npos) contentType = "application/javascript";
@@ -383,9 +334,8 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 
 	std::ostringstream contentLengthStream; contentLengthStream << content.length();
 	std::string responseContent = "Content-Type: " + contentType + "\r\n"
-									"Content-Length: " + contentLengthStream.str() + "\r\n"
-									+ request.connectionHeader(request.isConnectionAlive()) + "\r\n"
-									+ content;
+								+ request.connectionHeader(request.isConnectionAlive()) + "\r\n"
+								+ content;
 	HTTPResponse response("OK", 200, responseContent, socketFD);
 	response.sendResponse();
 	}

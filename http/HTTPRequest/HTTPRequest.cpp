@@ -545,3 +545,17 @@ void HTTPRequest::resetForNextRequest()
 	_path.clear();
 	_version.clear();
 }
+
+size_t HTTPRequest::endOfMessageOffset() const
+{
+	// header end
+	size_t header_end = _rawString.find("\r\n\r\n");
+	if (header_end == std::string::npos)
+		return (0);
+	size_t body_start = header_end + 4;
+	// If chunked, _bodyPos already points just past the final CRLF
+	if (_isChunked)
+		return (_bodyPos);
+	// Unchunked: use parsed content-length (0 for typical GET)
+	return (body_start + _content_length);
+}
