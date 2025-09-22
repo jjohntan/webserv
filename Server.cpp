@@ -82,8 +82,7 @@ void Server::run()
 		for (size_t i = 0; i < pfds.size(); i++)
 			{
 				int fd = pfds[i].fd;
-				if (last_activity.count(fd) && 
-					(current_time - last_activity[fd] > timeout))
+				if (last_activity.count(fd) && (current_time - last_activity[fd] > timeout))
 				{
 					std::cout << "Timeout closing fd " << fd << " (idle for " 
 							<< (current_time - last_activity[fd]) << "s)" << std::endl;

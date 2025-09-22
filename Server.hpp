@@ -27,7 +27,7 @@ class Server
 		// stored root for single-server compatibility (optional)
 		std::string root;
 		std::map<int, time_t> last_activity; //track last activity per fd
-		int timeout;
+		unsigned long timeout;
 
 		// [ADD] Per-client write buffer + close-after-write flag
 		struct ClientState { std::string outbox; bool close_after_write; };
