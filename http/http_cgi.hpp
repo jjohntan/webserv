@@ -13,6 +13,8 @@
 // [CHANGE] needed for std::remove
 #include <cstdio>
 
+#include <ctime>
+
 // [ADD] forward declaration to avoid heavy include in header
 class Server;
 
@@ -29,5 +31,18 @@ std::map<std::string, std::string> getCGIExtensions(const std::string& path, con
 
 // Main request processing function
 void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std::vector<ServerConfig>& servers, Server& srv); // [CHANGE]
+
+// Save an upload for POST /upload/ using the configured upload_path.
+// Supports multipart/form-data (with filename) and application/octet-stream.
+// Returns true on success and sets saved_path to the resulting absolute path.
+bool saveUploadedBody(const HTTPRequest& req,
+                      const Location* loc,
+                      const ServerConfig* sc,
+                      std::string& saved_path,
+                      std::string& error);
+
+// Small helpers
+std::string getHeaderCI(const std::map<std::string,std::string>& h, const std::string& key);
+std::string joinPath(const std::string& dir, const std::string& base);
 
 #endif
