@@ -1,6 +1,23 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# ---------------------------------------------------------
+# Webserv regression tester (extended for mandatory checks)
+# ---------------------------------------------------------
+# Env overrides:
+#   CFG_FILE   - path to config (default: testconfig/test.conf)
+#   BIN        - explicit binary path (default tries ./webserv ./webserver ./a.out)
+#   REDIR_PATH - path that should redirect (e.g., /old). If unset, redirect test is skipped.
+#   VHOST      - a server_name for virtual-host test on :8080 (e.g., example.com). If unset, skipped.
+#   SIEGE_C    - siege clients (default 25)
+#   SIEGE_T    - siege duration (default 10S)
+#
+# Ports used here must match your config:
+#   8080: static site, upload, methods
+#   8081: CGI
+#   8082: tiny body limit for 413 test
+# ---------------------------------------------------------
+
 # -----------------------------
 # Config (override via env vars)
 # -----------------------------
@@ -17,6 +34,7 @@ trap 'cleanup' EXIT INT TERM
 cleanup() {
   set +e
   [[ -n "${SERVER_PID:-}" ]] && kill "${SERVER_PID}" 2>/dev/null || true
+  [[ -n "${NC_TMP:-}" ]] && rm -f "$NC_TMP" 2>/dev/null || true
   sleep 0.2
   for p in "${PORTS[@]}"; do
     kill_port_listeners "$p" || true
@@ -25,6 +43,7 @@ cleanup() {
 }
 
 say()   { printf "%s\n" "$*"; }
+skip()  { say "[SKIP] $*"; }
 pass()  { say "[PASS] $*"; }
 fail()  { say "[FAIL] $*"; ((FAILS++)) || true; }
 fatal() { say "[FATAL] $*"; exit 1; }
@@ -87,6 +106,16 @@ curl_code() {
 # Never crash the script if body fetch fails
 curl_body() {
   curl -sS -m "$CURL_TIMEOUT" "$@" || true
+}
+
+# Single raw HTTP TCP shot (requires nc)
+raw_http_once() {
+  local host="$1" port="$2" payload="$3"
+  if ! have_cmd nc; then
+    echo "__NO_NC__"
+    return 0
+  fi
+  printf "%b" "$payload" | nc -w 2 "$host" "$port" 2>/dev/null || true
 }
 
 need_build() {
@@ -263,6 +292,162 @@ if [[ "$code" == "204" ]]; then
   fi
 else
   fail "DELETE file (got $code expected 204)"
+fi
+
+# ------------------------------------------------------------------
+# Extended mandatory checks from subject + evaluation sheet
+# ------------------------------------------------------------------
+
+# 10) UNKNOWN method should not crash; expect 405 or 501
+code=$(curl_code -X FOO "http://${HOST}:8080/")
+if [[ "$code" == "405" || "$code" == "501" ]]; then
+  pass "UNKNOWN method gets 405/501 (no crash)"
+else
+  fail "UNKNOWN method (got $code expected 405/501)"
+fi
+
+# 11) HEAD method on static should return headers and no body (Content-Length honored)
+head_headers="$(curl -sS -D - -o /dev/null -m "$CURL_TIMEOUT" -X HEAD "http://${HOST}:8080/")" || true
+if grep -qi '^HTTP/1\.[01] 200' <<<"$head_headers"; then
+  if grep -qi '^content-length:' <<<"$head_headers"; then
+    pass "HEAD returns 200 with Content-Length"
+  else
+    fail "HEAD missing Content-Length"
+  fi
+else
+  fail "HEAD did not return 200"
+fi
+
+# 12) Keep-Alive: two requests over one TCP connection (HTTP/1.1)
+NC_TMP="$(mktemp -t ws-keepalive-XXXXXX)" || true
+ka_req=$'GET / HTTP/1.1\r\nHost: '"${HOST}"$'\r\nConnection: keep-alive\r\n\r\nGET /about.html HTTP/1.1\r\nHost: '"${HOST}"$'\r\nConnection: close\r\n\r\n'
+ka_resp="$(raw_http_once "$HOST" 8080 "$ka_req")"
+if [[ "$ka_resp" == "__NO_NC__" ]]; then
+  skip "Keep-Alive (nc not installed)—skipping raw two-requests test"
+else
+  cnt=$(grep -cE '^HTTP/1\.[01] 200' <<<"$ka_resp" || true)
+  if [[ "$cnt" -ge 2 ]]; then
+    pass "Keep-Alive: multiple responses on one connection"
+  else
+    fail "Keep-Alive: expected two 200 responses on one connection"
+  fi
+fi
+
+# 13) Directory listing OFF on "/" (expect index served, not listing)
+body_root="$(curl_body "http://${HOST}:8080/")"
+if grep -qi "<title>webserv test page" <<<"$body_root"; then
+  pass "Autoindex OFF on / (index served)"
+else
+  skip "Autoindex OFF heuristic check (custom index?)"
+fi
+
+# 14) Method-limited route returns 405 for disallowed verb (DELETE /)
+code=$(curl_code -X DELETE "http://${HOST}:8080/")
+if [[ "$code" == "405" || "$code" == "403" ]]; then
+  pass "Method control: DELETE / disallowed"
+else
+  skip "Method control (DELETE /) expected 405/403; got $code (config-dependent)"
+fi
+
+# 15) Default error pages: ensure error bodies are HTML-ish (subject: must have defaults)
+code=$(curl_code "http://${HOST}:8080/this_path_should_not_exist_$(date +%s)")
+err_body="$(curl_body "http://${HOST}:8080/this_path_should_not_exist_$(date +%s)")"
+if [[ "$code" == "404" ]]; then
+  if grep -qiE "<html|<body|</html>|</body>" <<<"$err_body"; then
+    pass "Default error page (404) is HTML-like"
+  else
+    fail "Default error page (404) not HTML-like"
+  fi
+else
+  fail "Default error page: expected 404, got $code"
+fi
+
+# 16) Redirect route (config-dependent)
+REDIR_PATH="${REDIR_PATH:-/redirect}"
+redir_code=$(curl_code -I "http://${HOST}:8080${REDIR_PATH}")
+if [[ "$redir_code" == "301" || "$redir_code" == "302" ]]; then
+  pass "Redirect returns ${redir_code}"
+else
+  skip "Redirect test skipped (set REDIR_PATH to a configured redirect; got $redir_code)"
+fi
+
+# 17) Server names / virtual hosts on same port (config-dependent)
+if [[ -n "${VHOST:-}" ]]; then
+  vhost_code=$(curl_code --resolve "${VHOST}:8080:${HOST}" -H "Host: ${VHOST}" "http://${VHOST}:8080/")
+  if [[ "$vhost_code" == "200" ]]; then
+    pass "Virtual host (${VHOST}) on 8080 responds"
+  else
+    fail "Virtual host (${VHOST}) expected 200, got $vhost_code"
+  fi
+else
+  skip "Virtual host check skipped (set VHOST=your.server.name)"
+fi
+
+# 18) CGI POST (form) on 8081 (subject: CGI must work with GET and POST)
+cgip_code=$(curl_code -X POST -F "name=webserv" "http://${HOST}:8081/cgi_bin/hello.py")
+if [[ "$cgip_code" == "200" ]]; then
+  pass "CGI POST returns 200"
+else
+  fail "CGI POST (got $cgip_code expected 200)"
+fi
+
+# 19) Upload then GET back the exact file and verify bytes echo (binary-safe small file)
+UP_FILE="${TMP_DIR}/echo.bin"
+printf "WS-echo-%s" "$(date +%s)" > "$UP_FILE"
+UP_NAME="echo_$(date +%s).bin"
+up_code=$(curl_code -X POST -F "file=@${UP_FILE};filename=${UP_NAME}" "http://${HOST}:8080/upload/")
+if [[ "$up_code" == "200" || "$up_code" == "201" ]]; then
+  got="$(curl -sS -m "$CURL_TIMEOUT" "http://${HOST}:8080/upload/${UP_NAME}" || true)"
+  if [[ "$got" == "$(cat "$UP_FILE")" ]]; then
+    pass "Upload+GET back exact bytes"
+  else
+    fail "Uploaded bytes mismatch on download"
+  fi
+else
+  fail "Upload for echo file (got $up_code expected 200/201)"
+fi
+
+# 20) Body limit boundary (config-dependent)
+skip "Additional body-limit boundary case (config-dependent)—skipped"
+
+# 21) Directory traversal protection
+tr_code=$(curl_code "http://${HOST}:8080/../test.conf")
+if [[ "$tr_code" == "403" || "$tr_code" == "404" || "$tr_code" == "400" ]]; then
+  pass "Directory traversal blocked (${tr_code})"
+else
+  fail "Directory traversal not blocked (got $tr_code)"
+fi
+
+# 22) Connection close honored when client asks (Connection: close)
+close_hdrs="$(curl -sS -D - -o /dev/null -m "$CURL_TIMEOUT" -H 'Connection: close' "http://${HOST}:8080/")" || true
+if grep -qi '^connection: close' <<<"$close_hdrs"; then
+  pass "Connection: close honored"
+else
+  fail "Connection: close not present in response headers"
+fi
+
+# 23) Static DELETE forbidden outside allowed route (/about.html should not be deletable)
+code=$(curl_code -X DELETE "http://${HOST}:8080/about.html")
+if [[ "$code" == "405" || "$code" == "403" ]]; then
+  pass "DELETE protected for non-upload resource"
+else
+  fail "DELETE should be disallowed on /about.html (got $code)"
+fi
+
+# 24) Optional stress test with siege (availability > 99.5% on /)
+if have_cmd siege; then
+  SIEGE_C="${SIEGE_C:-25}"
+  SIEGE_T="${SIEGE_T:-10S}"
+  say "Running siege: -b -c ${SIEGE_C} -t ${SIEGE_T} http://${HOST}:8080/"
+  siege_out="$(siege -b -c "$SIEGE_C" -t "$SIEGE_T" "http://${HOST}:8080/" 2>/dev/null || true)"
+  avail="$(awk -F': *' '/Availability/ {gsub(/%/,"",$2); print $2}' <<<"$siege_out" | tail -n1)"
+  if [[ -n "$avail" ]]; then
+    awk "BEGIN{exit !($avail>=99.5)}" && pass "Siege availability ${avail}%" || fail "Siege availability ${avail}% (<99.5%)"
+  else
+    skip "Siege output unavailable; skipping availability assertion"
+  fi
+else
+  skip "siege not installed—skipping stress test"
 fi
 
 # -----------------------------

@@ -6,31 +6,43 @@
 #include <iostream>
 #include "../Server.hpp" // [ADD] need full type for srv.queueResponse
 
-// // Enforce allowed_methods, redirects, error pages, 413 limit, and static DELETE
-// // add near top of file (helpers)
-// static const Location* getMatchingLocation(const std::string& path, const ServerConfig* sc)
-// {
-// 	if (!sc) return NULL;
-// 	const Location* best = NULL;
-// 	size_t best_len = 0;
-// 	for (size_t i = 0; i < sc->locations.size(); ++i) {
-// 		const Location& L = sc->locations[i];
-// 		if (path.find(L.path) == 0 && L.path.length() > best_len) {
-// 			best = &L;
-// 			best_len = L.path.length();
-// 		}
-// 	}
-// 	return best;
-// }
+// [ADD] Build headers for HEAD (no body) with an explicit Content-Length.
+static std::string buildHeadOnlyHeaders(const std::string& contentType,
+										size_t contentLen,
+										const HTTPRequest& req)
+{
+	std::ostringstream out;
+	out << "Content-Type: " << contentType << "\r\n"
+		<< "Content-Length: " << contentLen << "\r\n"
+		<< req.connectionHeader(req.isConnectionAlive())
+		<< "\r\n"; // end of headers; no body
+	return out.str();
+}
 
-// static bool methodAllowed(const HTTPRequest& req, const Location* L)
-// {
-// 	if (!L || L->allowed_methods.empty()) return true; // default allow if not configured
-// 	for (size_t i = 0; i < L->allowed_methods.size(); ++i) {
-// 		if (req.getMethod() == L->allowed_methods[i]) return true;
-// 	}
-// 	return false;
-// }
+// [ADD] Remove any leading "Status:" header from CGI output (we supply status line).
+static void stripCgiStatusHeader(std::string& headersAndBody)
+{
+	// Only look in the header section before the first CRLFCRLF
+	size_t hdr_end = headersAndBody.find("\r\n\r\n");
+	if (hdr_end == std::string::npos) return;
+	std::string header = headersAndBody.substr(0, hdr_end);
+	std::string body   = headersAndBody.substr(hdr_end + 4);
+
+	std::istringstream hs(header);
+	std::ostringstream newHdr;
+	std::string line;
+	while (std::getline(hs, line)) {
+		if (!line.empty() && line[line.size()-1]=='\r') line.erase(line.size()-1,1);
+		std::string lower = line;
+		for (size_t i=0;i<lower.size();++i) lower[i] = std::tolower((unsigned char)lower[i]);
+		if (lower.rfind("status:", 0) == 0) {
+			// drop this line
+			continue;
+		}
+		newHdr << line << "\r\n";
+	}
+	headersAndBody = newHdr.str() + "\r\n" + body;
+}
 
 // Try to load configured error page; if not found, fall back to simple body
 static std::string loadErrorPageBody(int code, const ServerConfig* sc)
@@ -414,7 +426,10 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 			// Execute CGI
 			std::cout << "Executing CGI Script: " << script_path << std::endl;
 			CGIResult cgi_result = runCGI(request, script_path, cgi_extensions, working_directory);
-			HTTPResponse response(cgi_result.status_message, cgi_result.status_code, cgi_result.content, socketFD);
+			// [ADD] Remove any "Status:" header from CGI payload to avoid duplicate status signaling
+			std::string cgiPayload = cgi_result.content;
+			stripCgiStatusHeader(cgiPayload);
+			HTTPResponse response(cgi_result.status_message, cgi_result.status_code, cgiPayload, socketFD);
 			std::cout << "Queue CGI Response\n";
 			srv.queueResponse(socketFD, response.getRawResponse()); // [CHANGE]
 			return;
@@ -460,13 +475,24 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 	if (request.getMethod() == "POST" && matching_location) {
 		if (!matching_location->upload_path.empty()) {
 			std::string saved, err;
-			if (saveUploadedBody(request, matching_location, server_config, saved, err)) {
+			if (saveUploadedBody(request, matching_location, server_config, saved, err))
+			{
+				if (request.getMethod() == "HEAD") { // [ADD]
+					std::ostringstream okh;
+					okh << "Content-Type: text/plain\r\n"
+						<< "Content-Length: 0\r\n"
+						<< request.connectionHeader(request.isConnectionAlive())
+						<< "\r\n";
+					HTTPResponse resp("OK", 200, okh.str(), socketFD);
+					srv.queueResponse(socketFD, resp.getRawResponse());
+					return;
+				}
 				std::ostringstream ok;
 				ok << "Content-Type: text/plain\r\n"
-				<< request.connectionHeader(request.isConnectionAlive())
-				<< "\r\n"
-				<< "Uploaded to: " << saved << "\n";
-				HTTPResponse resp("OK", 200, ok.str(), socketFD);
+					<< request.connectionHeader(request.isConnectionAlive())
+					<< "\r\n"
+					<< "Uploaded to: " << saved << "\n";
+				HTTPResponse resp("OK", 200, ok.str(), socketFD); 
 				srv.queueResponse(socketFD, resp.getRawResponse());
 			} else {
 				// Config has upload_path but we failed to store → 500
@@ -483,12 +509,20 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 		// If no upload_path here, fall through to static/CGI rules
 	}
 
-	// Directory request → only list on GET (others fall through)
-	if (request.getMethod() == "GET" && !filePath.empty() && filePath[filePath.length() - 1] == '/') {
+	// Directory request → list on GET, and support HEAD (no body)
+	if ((request.getMethod() == "GET" || request.getMethod() == "HEAD") && !filePath.empty() && filePath[filePath.length() - 1] == '/') {
 		bool autoindex_enabled = (matching_location ? matching_location->autoindex : false);
 		if (autoindex_enabled) {
 			std::string dirListing = generateDirectoryListing(filePath);
-			std::ostringstream contentLengthStream; contentLengthStream << dirListing.length();
+			if (request.getMethod() == "HEAD")
+			{
+				std::string h = buildHeadOnlyHeaders("text/html",
+														dirListing.size(),
+														request);
+				HTTPResponse response("OK", 200, h, socketFD);
+				srv.queueResponse(socketFD, response.getRawResponse());
+				return;
+			}
 			std::string responseContent = "Content-Type: text/html\r\n"
 										+ request.connectionHeader(request.isConnectionAlive()) + "\r\n"
 										+ dirListing;
@@ -514,7 +548,14 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 	else if (filePath.find(".jpg") != std::string::npos || filePath.find(".jpeg") != std::string::npos) contentType = "image/jpeg";
 	else if (filePath.find(".png") != std::string::npos) contentType = "image/png";
 
-	std::ostringstream contentLengthStream; contentLengthStream << content.length();
+	if (request.getMethod() == "HEAD")
+	{ 
+		// [ADD] no body, correct length
+		std::string h = buildHeadOnlyHeaders(contentType, content.size(), request);
+		HTTPResponse response("OK", 200, h, socketFD);
+		srv.queueResponse(socketFD, response.getRawResponse());
+		return;
+	}
 	std::string responseContent = "Content-Type: " + contentType + "\r\n"
 								+ request.connectionHeader(request.isConnectionAlive()) + "\r\n"
 								+ content;

@@ -42,6 +42,7 @@ void Server::addNewConnection(int listen_fd, std::map<int, HTTPRequest> &request
 		addPfds(client_fd);
 		requestMap[client_fd] = HTTPRequest(client_fd); // create new HTTPRequest if haven't
 		client_state_[client_fd] = ClientState();       // [ADD] init outbox
+		client_state_[client_fd].close_after_write = false; // [ADD]
 	}
 }
 
@@ -92,7 +93,20 @@ void Server::run()
 						// remove the bytes we wrote (single write per poll)       // [ADD]
 						csit->second.outbox.erase(0, static_cast<size_t>(n));
 						if (csit->second.outbox.empty())
-							disableWrite(fd); // switch back to read-only         // [ADD]
+						{
+							if (csit->second.close_after_write)
+							{
+								// graceful close after fully flushed               // [ADD]
+								close(fd);                                         // [ADD]
+								client_state_.erase(fd);                           // [ADD]
+								request_map.erase(fd);                             // [ADD]
+								pfds.erase(pfds.begin() + i);                      // [ADD]
+								--i;                                               // [ADD]
+								// do not touch pfds[i].revents after erase        // [ADD]
+								continue;                                          // [ADD]
+							}
+						disableWrite(fd); // switch back to read-only
+						}
 					}
 					else
 					{
@@ -292,6 +306,16 @@ void Server::queueResponse(int fd, const std::string& data)
 	enableWrite(fd);
 }
 
+// [ADD] Ask to close once all queued bytes are sent
+void Server::markCloseAfterWrite(int fd)
+{
+	std::map<int, ClientState>::iterator it = client_state_.find(fd);
+	if (it != client_state_.end()) {
+	it->second.close_after_write = true;
+	// ensure POLLOUT wakes us to flush & close
+	enableWrite(fd);
+}
+}
 	// Server
 
 	// socket
