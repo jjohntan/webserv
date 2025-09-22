@@ -261,18 +261,18 @@ Version: HTTP/1.1
 --- Headers ---
 [0maccept: */*
 content-length: 212
-content-type: multipart/form-data; boundary=------------------------90e6b0e1720abdd6
+content-type: multipart/form-data; boundary=------------------------a638150d07300613
 host: 127.0.0.1:8080
 user-agent: curl/7.81.0
 [32m
 --- Body ---
-[0m--------------------------90e6b0e1720abdd6
-Content-Disposition: form-data; name="file"; filename="small_1758528180.txt"
+[0m--------------------------a638150d07300613
+Content-Disposition: form-data; name="file"; filename="small_1758529363.txt"
 Content-Type: text/plain
 
 hello webserv
 
---------------------------90e6b0e1720abdd6--
+--------------------------a638150d07300613--
 
 CGI Status - Path: /upload/ | CGI Enabled: NO
 There is no content-length in the header!
@@ -660,7 +660,7 @@ Request From Socket 6 had successfully converted into object!
 [32m
 --- Request Line ---
 [0mMethod: GET
-Path: /no_such_page_1758528180.html
+Path: /no_such_page_1758529363.html
 Version: HTTP/1.1
 [32m
 --- Headers ---
@@ -670,7 +670,7 @@ user-agent: curl/7.81.0
 [32m
 --- Body ---
 [0m
-CGI Status - Path: /no_such_page_1758528180.html | CGI Enabled: NO
+CGI Status - Path: /no_such_page_1758529363.html | CGI Enabled: NO
 There is no content-length in the header!
 Request From Socket 6 had successfully converted into object!
 [32m
@@ -715,18 +715,18 @@ Version: HTTP/1.1
 --- Headers ---
 [0maccept: */*
 content-length: 220
-content-type: multipart/form-data; boundary=------------------------e0d25fc01cef9d7f
+content-type: multipart/form-data; boundary=------------------------7d38f2061228da87
 host: 127.0.0.1:8080
 user-agent: curl/7.81.0
 [32m
 --- Body ---
-[0m--------------------------e0d25fc01cef9d7f
-Content-Disposition: form-data; name="file"; filename="tmp_delete_1758528181.txt"
+[0m--------------------------7d38f2061228da87
+Content-Disposition: form-data; name="file"; filename="tmp_delete_1758529364.txt"
 Content-Type: text/plain
 
 please delete me
 
---------------------------e0d25fc01cef9d7f--
+--------------------------7d38f2061228da87--
 
 CGI Status - Path: /upload/ | CGI Enabled: NO
 There is no content-length in the header!
@@ -734,7 +734,7 @@ Request From Socket 6 had successfully converted into object!
 [32m
 --- Request Line ---
 [0mMethod: DELETE
-Path: /upload/tmp_delete_1758528181.txt
+Path: /upload/tmp_delete_1758529364.txt
 Version: HTTP/1.1
 [32m
 --- Headers ---
@@ -744,13 +744,13 @@ user-agent: curl/7.81.0
 [32m
 --- Body ---
 [0m
-CGI Status - Path: /upload/tmp_delete_1758528181.txt | CGI Enabled: NO
+CGI Status - Path: /upload/tmp_delete_1758529364.txt | CGI Enabled: NO
 There is no content-length in the header!
 Request From Socket 6 had successfully converted into object!
 [32m
 --- Request Line ---
 [0mMethod: GET
-Path: /upload/tmp_delete_1758528181.txt
+Path: /upload/tmp_delete_1758529364.txt
 Version: HTTP/1.1
 [32m
 --- Headers ---
@@ -760,7 +760,7 @@ user-agent: curl/7.81.0
 [32m
 --- Body ---
 [0m
-CGI Status - Path: /upload/tmp_delete_1758528181.txt | CGI Enabled: NO
+CGI Status - Path: /upload/tmp_delete_1758529364.txt | CGI Enabled: NO
 There is no content-length in the header!
 Request From Socket 6 had successfully converted into object!
 [32m
@@ -856,7 +856,7 @@ Request From Socket 6 had successfully converted into object!
 [32m
 --- Request Line ---
 [0mMethod: GET
-Path: /this_path_should_not_exist_1758528188
+Path: /this_path_should_not_exist_1758529370
 Version: HTTP/1.1
 [32m
 --- Headers ---
@@ -866,13 +866,13 @@ user-agent: curl/7.81.0
 [32m
 --- Body ---
 [0m
-CGI Status - Path: /this_path_should_not_exist_1758528188 | CGI Enabled: NO
+CGI Status - Path: /this_path_should_not_exist_1758529370 | CGI Enabled: NO
 There is no content-length in the header!
 Request From Socket 6 had successfully converted into object!
 [32m
 --- Request Line ---
 [0mMethod: GET
-Path: /this_path_should_not_exist_1758528188
+Path: /this_path_should_not_exist_1758529370
 Version: HTTP/1.1
 [32m
 --- Headers ---
@@ -882,7 +882,7 @@ user-agent: curl/7.81.0
 [32m
 --- Body ---
 [0m
-CGI Status - Path: /this_path_should_not_exist_1758528188 | CGI Enabled: NO
+CGI Status - Path: /this_path_should_not_exist_1758529370 | CGI Enabled: NO
 There is no content-length in the header!
 Request From Socket 6 had successfully converted into object!
 [32m
@@ -910,16 +910,16 @@ Version: HTTP/1.1
 --- Headers ---
 [0maccept: */*
 content-length: 146
-content-type: multipart/form-data; boundary=------------------------0b04312c15db4dd9
+content-type: multipart/form-data; boundary=------------------------1dfd401704f9b813
 host: 127.0.0.1:8081
 user-agent: curl/7.81.0
 [32m
 --- Body ---
-[0m--------------------------0b04312c15db4dd9
+[0m--------------------------1dfd401704f9b813
 Content-Disposition: form-data; name="name"
 
 webserv
---------------------------0b04312c15db4dd9--
+--------------------------1dfd401704f9b813--
 
 CGI Status - Path: /cgi_bin/hello.py | CGI Enabled: YES
 Executing CGI Script: ./cgi_bin/hello.py
@@ -931,10 +931,10 @@ Executing CGI Script: ./cgi_bin/hello.py
 [DEBUG] CGI setupStandardCGIVars - All headers:
 [DEBUG] Header: 'accept' = '*/*'
 [DEBUG] Header: 'content-length' = '146'
-[DEBUG] Header: 'content-type' = 'multipart/form-data; boundary=------------------------0b04312c15db4dd9'
+[DEBUG] Header: 'content-type' = 'multipart/form-data; boundary=------------------------1dfd401704f9b813'
 [DEBUG] Header: 'host' = '127.0.0.1:8081'
 [DEBUG] Header: 'user-agent' = 'curl/7.81.0'
-[DEBUG] CGI setupStandardCGIVars - Setting CONTENT_TYPE for POST: multipart/form-data; boundary=------------------------0b04312c15db4dd9
+[DEBUG] CGI setupStandardCGIVars - Setting CONTENT_TYPE for POST: multipart/form-data; boundary=------------------------1dfd401704f9b813
 [DEBUG] CGI executeCGI - Final script path for execution: cgi_bin/hello.py
 output =Content-Type: text/html
 
@@ -963,11 +963,11 @@ th { background-color: #f2f2f2; }
 <div class='success'>
 <h2>POST Request Successful</h2>
 <h3>POST Data Received:</h3>
-<pre>--------------------------0b04312c15db4dd9
+<pre>--------------------------1dfd401704f9b813
 Content-Disposition: form-data; name="name"
 
 webserv
---------------------------0b04312c15db4dd9--
+--------------------------1dfd401704f9b813--
 </pre>
 </div>
 <h2>CGI Environment Variables:</h2>
@@ -975,7 +975,7 @@ webserv
 <tr><td><strong>REQUEST_METHOD</strong></td><td>POST</td></tr>
 <tr><td><strong>QUERY_STRING</strong></td><td></td></tr>
 <tr><td><strong>CONTENT_LENGTH</strong></td><td>146</td></tr>
-<tr><td><strong>CONTENT_TYPE</strong></td><td>multipart/form-data; boundary=------------------------0b04312c15db4dd9</td></tr>
+<tr><td><strong>CONTENT_TYPE</strong></td><td>multipart/form-data; boundary=------------------------1dfd401704f9b813</td></tr>
 <tr><td><strong>SERVER_NAME</strong></td><td>localhost</td></tr>
 <tr><td><strong>SERVER_PORT</strong></td><td>8080</td></tr>
 <tr><td><strong>SCRIPT_NAME</strong></td><td>./cgi_bin/hello.py</td></tr>
@@ -1044,7 +1044,7 @@ th { background-color: #f2f2f2; }
 <div class='success'>
 <h2>POST Request Successful</h2>
 <h3>POST Data Received:</h3>
-<pre>--------------------------0b04312c15db4dd9
+<pre>--------------------------1dfd401704f9b813
 Content-Disposition: form-data; name="name"'
 [DEBUG] CGI parseOutput - Body length: 1861
 [DEBUG] CGI executeCGI - Socket FD: 6
@@ -1078,11 +1078,11 @@ th { background-color: #f2f2f2; }
 <div class='success'>
 <h2>POST Request Successful</h2>
 <h3>POST Data Received:</h3>
-<pre>--------------------------0b04312c15db4dd9
+<pre>--------------------------1dfd401704f9b813
 Content-Disposition: form-data; name="name"
 
 webserv
---------------------------0b04312c15db4dd9--
+--------------------------1dfd401704f9b813--
 </pre>
 </div>
 <h2>CGI Environment Variables:</h2>
@@ -1090,7 +1090,7 @@ webserv
 <tr><td><strong>REQUEST_METHOD</strong></td><td>POST</td></tr>
 <tr><td><strong>QUERY_STRING</strong></td><td></td></tr>
 <tr><td><strong>CONTENT_LENGTH</strong></td><td>146</td></tr>
-<tr><td><strong>CONTENT_TYPE</strong></td><td>multipart/form-data; boundary=------------------------0b04312c15db4dd9</td></tr>
+<tr><td><strong>CONTENT_TYPE</strong></td><td>multipart/form-data; boundary=------------------------1dfd401704f9b813</td></tr>
 <tr><td><strong>SERVER_NAME</strong></td><td>localhost</td></tr>
 <tr><td><strong>SERVER_PORT</strong></td><td>8080</td></tr>
 <tr><td><strong>SCRIPT_NAME</strong></td><td>./cgi_bin/hello.py</td></tr>
@@ -1141,17 +1141,17 @@ Version: HTTP/1.1
 --- Headers ---
 [0maccept: */*
 content-length: 229
-content-type: multipart/form-data; boundary=------------------------61466d6ff5928c8a
+content-type: multipart/form-data; boundary=------------------------e8e9b55ed2c42c2e
 host: 127.0.0.1:8080
 user-agent: curl/7.81.0
 [32m
 --- Body ---
-[0m--------------------------61466d6ff5928c8a
-Content-Disposition: form-data; name="file"; filename="echo_1758528188.bin"
+[0m--------------------------e8e9b55ed2c42c2e
+Content-Disposition: form-data; name="file"; filename="echo_1758529370.bin"
 Content-Type: application/octet-stream
 
-WS-echo-1758528188
---------------------------61466d6ff5928c8a--
+WS-echo-1758529370
+--------------------------e8e9b55ed2c42c2e--
 
 CGI Status - Path: /upload/ | CGI Enabled: NO
 There is no content-length in the header!
@@ -1159,7 +1159,7 @@ Request From Socket 6 had successfully converted into object!
 [32m
 --- Request Line ---
 [0mMethod: GET
-Path: /upload/echo_1758528188.bin
+Path: /upload/echo_1758529370.bin
 Version: HTTP/1.1
 [32m
 --- Headers ---
@@ -1169,7 +1169,7 @@ user-agent: curl/7.81.0
 [32m
 --- Body ---
 [0m
-CGI Status - Path: /upload/echo_1758528188.bin | CGI Enabled: NO
+CGI Status - Path: /upload/echo_1758529370.bin | CGI Enabled: NO
 There is no content-length in the header!
 Request From Socket 6 had successfully converted into object!
 [32m
