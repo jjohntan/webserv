@@ -48,6 +48,16 @@ bool	methodAllowed(const HTTPRequest &request, const Location *Location)
 	// Default "Allow" if not configured
 	if (!Location || Location->allowed_methods.empty())
 		return (true);
+	// [ADD] RFC: If GET is allowed, treat HEAD as allowed too.
+	// We check this first so HEAD won’t be rejected when only GET is listed.
+	if (request.getMethod() == "HEAD")
+	{
+		for (size_t i = 0; i < Location->allowed_methods.size(); ++i)
+		{
+			if (Location->allowed_methods[i] == "GET") 
+				return (true);
+		}
+	}
 	for (size_t	i = 0; i < Location->allowed_methods.size(); ++i)
 	{
 		if (request.getMethod() == Location->allowed_methods[i])
@@ -241,13 +251,13 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 			std::cout << "Request From Socket " << socketFD << " had successfully converted into object!\n";
 			printRequest(req);
 
-			if (checkAllowedMethod(req, socketFD, servers, srv) ||          // [CHANGE]
-				checkPayLoad(req, socketFD, servers, srv) ||                // [CHANGE]
-				checkRedirectResponse(req, socketFD, servers, srv))         // [CHANGE]
+			if (checkAllowedMethod(req, socketFD, servers, srv) ||
+				checkPayLoad(req, socketFD, servers, srv) ||
+				checkRedirectResponse(req, socketFD, servers, srv))
 			{
 				bool closeIt = !req.isConnectionAlive();
 				if (closeIt)
-					return (true);
+					srv.markCloseAfterWrite(socketFD);      // [ADD] close after queued bytes flush
 
 				// keep remainder (if any), then reset and re-feed it
 				size_t used = req.endOfMessageOffset();
@@ -258,14 +268,14 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 					req.feed(tail);
 					continue; // loop for next buffered request
 				}
-				return (false);
+				return (false); // do not force-close here
 			}
 
 			// normal response path
 			handleRequestProcessing(req, socketFD, servers, srv); // [CHANGE] queues internally
 			bool closeIt = !req.isConnectionAlive();
-			if (closeIt) 
-				return (true);
+				if (closeIt)
+					srv.markCloseAfterWrite(socketFD);      // [ADD] close after queued bytes flush
 
 			// keep remainder (if any), then reset and re-feed it
 			size_t used = req.endOfMessageOffset();
@@ -304,6 +314,7 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 		{
 			ErrorResponse err(400, "Bad Request", *active, socketFD);
 			srv.queueResponse(socketFD, err.getRawResponse());
+			srv.markCloseAfterWrite(socketFD);   // [ADD] close after sending the error
 		}
 		else
 		{
@@ -318,8 +329,9 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 				<< body;
 			HTTPResponse err("Bad Request", 400, out.str(), socketFD);
 			srv.queueResponse(socketFD, err.getRawResponse());
+			srv.markCloseAfterWrite(socketFD);   // [ADD]
 		}
 
-		return (true); // close the connection on parser error
+		return (false); // let POLLOUT flush then close
 	}
 }

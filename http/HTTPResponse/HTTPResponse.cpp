@@ -297,7 +297,8 @@ void	HTTPResponse::addStatusLineToContent()
 
 void HTTPResponse::ensureContentLength()
 {
-	// If there is no body, do nothing (e.g., 204/HEAD/no-body responses)
+	// If there is no body, keep headers as-is (e.g., 204/HEAD/no-body responses).
+	// Caller should have added Content-Length appropriately.
 	if (_body.empty()) return;
 
 	// Rebuild header without any existing Content-Length (case-insensitive),

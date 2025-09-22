@@ -27,8 +27,8 @@ class Server
 		// stored root for single-server compatibility (optional)
 		std::string root;
 
-		// [ADD] Per-client write buffer (outbox)
-		struct ClientState { std::string outbox; };
+		// [ADD] Per-client write buffer + close-after-write flag
+		struct ClientState { std::string outbox; bool close_after_write; };
 		std::map<int, ClientState> client_state_; // by client fd  // [ADD]
 		
 		// helper
@@ -54,6 +54,7 @@ class Server
 		void run();
 		bool start();
 		void queueResponse(int fd, const std::string& data); // [ADD]
+		void markCloseAfterWrite(int fd); // [ADD]
 };
 
 #endif
