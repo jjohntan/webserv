@@ -7,10 +7,15 @@
 #include <map>
 #include <string>
 #include <vector>
+
 // [CHANGE] needed for stat()
 #include <sys/stat.h>
 // [CHANGE] needed for std::remove
 #include <cstdio>
+
+// [ADD] forward declaration to avoid heavy include in header
+class Server;
+
 
 // CGI and file serving functions
 CGIResult runCGI(const HTTPRequest& request, const std::string& script_path, const std::map<std::string, std::string>& cgi_extensions, const std::string& working_directory);
@@ -23,6 +28,6 @@ bool isCGIEnabled(const std::string& path, const ServerConfig* server_config);
 std::map<std::string, std::string> getCGIExtensions(const std::string& path, const ServerConfig* server_config);
 
 // Main request processing function
-void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std::vector<ServerConfig>& servers);
+void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std::vector<ServerConfig>& servers, Server& srv); // [CHANGE]
 
 #endif

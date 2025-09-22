@@ -4,23 +4,24 @@
 #include <dirent.h>
 #include <sstream>
 #include <iostream>
+#include "../Server.hpp" // [ADD] need full type for srv.queueResponse
 
-// Enforce allowed_methods, redirects, error pages, 413 limit, and static DELETE
-// add near top of file (helpers)
-static const Location* getMatchingLocation(const std::string& path, const ServerConfig* sc)
-{
-	if (!sc) return NULL;
-	const Location* best = NULL;
-	size_t best_len = 0;
-	for (size_t i = 0; i < sc->locations.size(); ++i) {
-		const Location& L = sc->locations[i];
-		if (path.find(L.path) == 0 && L.path.length() > best_len) {
-			best = &L;
-			best_len = L.path.length();
-		}
-	}
-	return best;
-}
+// // Enforce allowed_methods, redirects, error pages, 413 limit, and static DELETE
+// // add near top of file (helpers)
+// static const Location* getMatchingLocation(const std::string& path, const ServerConfig* sc)
+// {
+// 	if (!sc) return NULL;
+// 	const Location* best = NULL;
+// 	size_t best_len = 0;
+// 	for (size_t i = 0; i < sc->locations.size(); ++i) {
+// 		const Location& L = sc->locations[i];
+// 		if (path.find(L.path) == 0 && L.path.length() > best_len) {
+// 			best = &L;
+// 			best_len = L.path.length();
+// 		}
+// 	}
+// 	return best;
+// }
 
 // static bool methodAllowed(const HTTPRequest& req, const Location* L)
 // {
@@ -63,7 +64,7 @@ static std::string loadErrorPageBody(int code, const ServerConfig* sc)
 	return os.str();
 }
 
-static void sendError( int code, const std::string& message, int socketFD, const ServerConfig* sc, const HTTPRequest* req)
+static void sendError( int code, const std::string& message, int socketFD, const ServerConfig* sc, const HTTPRequest* req, Server& srv) // [CHANGE]
 {
 	std::string body = loadErrorPageBody(code, sc);
 	std::ostringstream len; len << body.size();
@@ -74,7 +75,7 @@ static void sendError( int code, const std::string& message, int socketFD, const
 		full += "Connection: close\r\n";
 	full += "\r\n" + body;
 	HTTPResponse resp(message, code, full, socketFD);
-	resp.sendResponse();
+	srv.queueResponse(socketFD, resp.getRawResponse()); // [CHANGE]
 }
 /* --------------------------------------------------------------------------------------------------------------------------------*/
 
@@ -232,7 +233,7 @@ std::map<std::string, std::string> getCGIExtensions(const std::string& path, con
 }
 
 // Main function to handle CGI checking and file serving
-void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std::vector<ServerConfig>& servers)
+void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std::vector<ServerConfig>& servers, Server& srv) // [CHANGE]
 {
 	std::string path = request.getPath();
 
@@ -260,8 +261,8 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 			std::cout << "Executing CGI Script: " << script_path << std::endl;
 			CGIResult cgi_result = runCGI(request, script_path, cgi_extensions, working_directory);
 			HTTPResponse response(cgi_result.status_message, cgi_result.status_code, cgi_result.content, socketFD);
-			std::cout << "Sending CGI Response Back to Socket\n";
-			response.sendResponse();
+			std::cout << "Queue CGI Response\n";
+			srv.queueResponse(socketFD, response.getRawResponse()); // [CHANGE]
 			return;
 		}
 		// fall-through to static if needsCGI()==false
@@ -291,18 +292,18 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 			if (std::remove(filePath.c_str()) == 0) {
 				std::string content = request.connectionHeader(request.isConnectionAlive()) + "\r\n";
 				HTTPResponse resp("No Content", 204, content, socketFD);
-				resp.sendResponse();
+				srv.queueResponse(socketFD, resp.getRawResponse()); // [CHANGE]
 			}
 			else
-				sendError(403, "Forbidden", socketFD, server_config, &request);
+				sendError(403, "Forbidden", socketFD, server_config, &request, srv); // [CHANGE]
 		}
 		else
-			sendError(404, "Not Found", socketFD, server_config, &request);
+			sendError(404, "Not Found", socketFD, server_config, &request, srv);     // [CHANGE]
 		return ;
 	}
 
-	// Directory request → autoindex or 403
-	if (!filePath.empty() && filePath[filePath.length() - 1] == '/') {
+	// Directory request → only list on GET (others fall through)
+	if (request.getMethod() == "GET" && !filePath.empty() && filePath[filePath.length() - 1] == '/') {
 		bool autoindex_enabled = (matching_location ? matching_location->autoindex : false);
 		if (autoindex_enabled) {
 			std::string dirListing = generateDirectoryListing(filePath);
@@ -311,17 +312,17 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 										+ request.connectionHeader(request.isConnectionAlive()) + "\r\n"
 										+ dirListing;
 			HTTPResponse response("OK", 200, responseContent, socketFD);
-			response.sendResponse();
+			srv.queueResponse(socketFD, response.getRawResponse()); // [CHANGE]
 		}
 		else
-			sendError(403, "Forbidden", socketFD, server_config, &request);
+			sendError(403, "Forbidden", socketFD, server_config, &request, srv);     // [CHANGE]
 		return;
 	}
 
 	// Regular file
 	std::string content = serveFile(filePath);
 	if (content.empty()) {
-		sendError(404, "Not Found", socketFD, server_config, &request);
+		sendError(404, "Not Found", socketFD, server_config, &request, srv);         // [CHANGE]
 		return;
 	}
 
@@ -337,5 +338,5 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 								+ request.connectionHeader(request.isConnectionAlive()) + "\r\n"
 								+ content;
 	HTTPResponse response("OK", 200, responseContent, socketFD);
-	response.sendResponse();
-	}
+	srv.queueResponse(socketFD, response.getRawResponse()); // [CHANGE]
+}

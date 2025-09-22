@@ -180,22 +180,26 @@ void	HTTPResponse::setStatusMessage(const std::string statusMessage)
 // 	this->addStatusLineToContent();
 // }
 
+
 void	HTTPResponse::sendResponse() const
 {
-	const std::string &response = this->_completeRawResponse;
-	ssize_t total_sent = 0;
-	ssize_t response_size = response.size();
+	// const std::string &response = this->_completeRawResponse;
+	// ssize_t total_sent = 0;
+	// ssize_t response_size = response.size();
 
-	while (total_sent < response_size)
-	{
-		ssize_t sent = send(_socketFD, response.c_str() + total_sent, response_size - total_sent, 0);
-		if (sent == -1)
-		{
-			std::cerr << "Failed to send response to socket FD " << _socketFD << std::endl;
-			break;
-		}
-		total_sent += sent;
-	}
+	// while (total_sent < response_size)
+	// {
+	// 	ssize_t sent = send(_socketFD, response.c_str() + total_sent, response_size - total_sent, 0);
+	// 	if (sent == -1)
+	// 	{
+	// 		std::cerr << "Failed to send response to socket FD " << _socketFD << std::endl;
+	// 		break;
+	// 	}
+	// 	total_sent += sent;
+	// }
+	
+	// [CHANGE] Do nothing: sending is handled by Server outbox (one write per poll tick).
+	std::cerr << "[warn] sendResponse() is deprecated; use queued sending via Server.\n";
 }
 /************************ STATUS LINE ***************** */
 
