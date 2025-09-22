@@ -2,6 +2,18 @@
 
 #include <csignal>
 
+void sendTimeoutResponse(int fd)
+{
+    std::string response = "HTTP/1.1 408 Request Timeout\r\n"
+                          "Connection: close\r\n"
+                          "Content-Type: text/plain\r\n"
+                          "Content-Length: 19\r\n\r\n"
+                          "408 Request Timeout";
+    
+    send(fd, response.c_str(), response.length(), MSG_DONTWAIT);
+    std::cout << "Sent 408 timeout response to fd " << fd << std::endl;
+}
+
 volatile sig_atomic_t g_running = true;
 
 void signalHandler(int signum)
@@ -48,6 +60,7 @@ void Server::addNewConnection(int listen_fd, std::map<int, HTTPRequest> &request
 		requestMap[client_fd] = HTTPRequest(client_fd); // create new HTTPRequest if haven't
 		client_state_[client_fd] = ClientState();       // [ADD] init outbox
 		client_state_[client_fd].close_after_write = false; // [ADD]
+		last_activity[client_fd] = time(NULL);
 	}
 }
 
@@ -78,32 +91,33 @@ void Server::run()
 			break;
 		}
 
-		size_t current_time = time(NULL);
+		time_t current_time = time(NULL);
 		for (size_t i = 0; i < pfds.size(); i++)
+		{
+			int fd = pfds[i].fd;
+			
+			// Skip listening sockets for timeout checking
+			if (isListeningSocket(fd))
+				continue;
+				
+			if (last_activity.count(fd) && (current_time - last_activity[fd] > timeout))
 			{
-				int fd = pfds[i].fd;
-				if (last_activity.count(fd) && (current_time - last_activity[fd] > timeout))
-				{
-					std::cout << "Timeout closing fd " << fd << " (idle for " 
-							<< (current_time - last_activity[fd]) << "s)" << std::endl;
-					
-					// Send 408 response if possible
-					if (client_state_.count(fd) && !client_state_[fd].outbox.empty()) {
-						// Try to send pending data quickly
-						send(fd, client_state_[fd].outbox.data(), 
-							client_state_[fd].outbox.size(), MSG_DONTWAIT);
-					}
-					
-					// Clean up
-					close(fd);
-					client_state_.erase(fd);
-					request_map.erase(fd);
-					last_activity.erase(fd);
-					removePfds(i);
-					--i; // Adjust index after removal
-					continue;
-				}
+				std::cout << "Timeout closing fd " << fd << " (idle for " 
+						<< (current_time - last_activity[fd]) << "s)" << std::endl;
+				
+				// Send proper 408 timeout response
+				sendTimeoutResponse(fd);
+				
+				// Clean up
+				close(fd);
+				client_state_.erase(fd);
+				request_map.erase(fd);
+				last_activity.erase(fd);
+				removePfds(i);
+				--i; // Adjust index after removal
+				continue;
 			}
+		}
 		for (size_t i = 0; i < pfds.size(); i++)
 		{
 			 // Handle error-y revents (prevents “mystery hangs”)
@@ -112,6 +126,7 @@ void Server::run()
 				close(fd);                                    // [ADD]
 				client_state_.erase(fd);                      // [ADD]
 				request_map.erase(fd);                        // [ADD]
+				last_activity.erase(fd);
 				pfds.erase(pfds.begin() + i);                 // [ADD]
 				--i;                                          // [ADD]
 				continue;                                     // [ADD]
@@ -142,6 +157,7 @@ void Server::run()
 								close(fd);                                         // [ADD]
 								client_state_.erase(fd);                           // [ADD]
 								request_map.erase(fd);                             // [ADD]
+								last_activity.erase(fd);
 								pfds.erase(pfds.begin() + i);                      // [ADD]
 								--i;                                               // [ADD]
 								// do not touch pfds[i].revents after erase        // [ADD]
@@ -157,6 +173,7 @@ void Server::run()
 						close(fd);                                                 // [ADD]
 						client_state_.erase(fd);                                   // [ADD]
 						request_map.erase(fd);                                     // [ADD]
+						last_activity.erase(fd);
 						pfds.erase(pfds.begin() + i);                              // [ADD]
 						--i;                                                       // [ADD]
 					}
