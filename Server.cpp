@@ -37,8 +37,11 @@ void Server::addNewConnection(int listen_fd, std::map<int, HTTPRequest> &request
 	}
 	else
 	{
+		// [ADD] Optional: leave blocking; poll() ensures readiness.
+		// If you switch to nonblocking, DO NOT inspect errno after send/read.
 		addPfds(client_fd);
 		requestMap[client_fd] = HTTPRequest(client_fd); // create new HTTPRequest if haven't
+		client_state_[client_fd] = ClientState();       // [ADD] init outbox
 	}
 }
 
@@ -71,7 +74,42 @@ void Server::run()
 
 		for (size_t i = 0; i < pfds.size(); i++)
 		{
-			// check if someone ready to read
+			// [ADD] Handle exactly one write OR one read per client per poll tick
+			if (pfds[i].revents & POLLOUT)
+			{
+				int fd = pfds[i].fd;
+				std::map<int, ClientState>::iterator csit = client_state_.find(fd);
+				if (csit == client_state_.end() || csit->second.outbox.empty())
+				{
+					disableWrite(fd); // nothing to write; stop POLLOUT  // [ADD]
+				}
+				else
+				{
+					const std::string &buf = csit->second.outbox;
+					ssize_t n = send(fd, buf.data(), buf.size(), 0);
+					if (n > 0)
+					{
+						// remove the bytes we wrote (single write per poll)       // [ADD]
+						csit->second.outbox.erase(0, static_cast<size_t>(n));
+						if (csit->second.outbox.empty())
+							disableWrite(fd); // switch back to read-only         // [ADD]
+					}
+					else
+					{
+						// DO NOT inspect errno; generic log and close.            // [ADD]
+						std::cerr << "send failed on fd " << fd << "\n";          // [ADD]
+						close(fd);                                                 // [ADD]
+						client_state_.erase(fd);                                   // [ADD]
+						request_map.erase(fd);                                     // [ADD]
+						pfds.erase(pfds.begin() + i);                              // [ADD]
+						--i;                                                       // [ADD]
+					}
+				}
+				pfds[i].revents = 0;
+				continue; // one write OR one read per poll tick                   // [ADD]
+			}
+
+			// check if someone ready to read (or closed)
 			if (pfds[i].revents & (POLLIN | POLLHUP))
 			{
 				// if is listener, it is a new connection
@@ -82,32 +120,32 @@ void Server::run()
 				// just a regular client
 				else
 				{
-					readClientData(pfds[i].fd, request_map, pfds, i, servers);
+					readClientData(pfds[i].fd, request_map, pfds, i, servers, *this);
 				}
 			}
 			pfds[i].revents = 0;
 		}
 	}
 	 // Close all client connections
-    for (size_t i = 0; i < pfds.size(); i++)
-    {
-        if (pfds[i].fd >= 0)
-        {
-            close(pfds[i].fd);
-        }
-    }
-    
-    // // Close server socket
-    // if (sockfd >= 0)
-    // {
-    //     close(sockfd);
-    //     sockfd = -1;
-    // }
-    
-    // Clear the pollfd vector
-    pfds.clear();
-    
-    std::cout << "Server shut down gracefully" << std::endl;
+	for (size_t i = 0; i < pfds.size(); i++)
+	{
+		if (pfds[i].fd >= 0)
+		{
+			close(pfds[i].fd);
+		}
+	}
+
+	// // Close server socket
+	// if (sockfd >= 0)
+	// {
+	//     close(sockfd);
+	//     sockfd = -1;
+	// }
+
+	// Clear the pollfd vector
+	pfds.clear();
+
+	std::cout << "Server shut down gracefully" << std::endl;
 }
 
 int Server::createListeningSocket(const std::string& port_str)
@@ -130,8 +168,8 @@ int Server::createListeningSocket(const std::string& port_str)
 
 	int sockfd = -1;
 	
-	// Set sockfd to non-blocking
-	fcntl(sockfd, F_SETFL, O_NONBLOCK);
+	// // Set sockfd to non-blocking
+	// fcntl(sockfd, F_SETFL, O_NONBLOCK);
 	for (ptr = ai; ptr != NULL; ptr = ptr->ai_next)
 	{
 		sockfd = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
@@ -139,6 +177,8 @@ int Server::createListeningSocket(const std::string& port_str)
 		{
 			continue;
 		}
+		// [ADD] If you want non-blocking listeners, set it **after** socket()
+		fcntl(sockfd, F_SETFL, O_NONBLOCK);
 		
 		// set sockfd to allow multiple connection
 		setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
@@ -232,6 +272,24 @@ Server::~Server()
 	{
 		close(pfds[i].fd);
 	}
+}
+
+
+// ============================ Helpers ============================  // [ADD]
+void Server::enableWrite(int fd)
+{
+	for (size_t i = 0; i < pfds.size(); ++i)
+		if (pfds[i].fd == fd) { pfds[i].events |= POLLOUT; break; }
+}
+void Server::disableWrite(int fd)
+{
+	for (size_t i = 0; i < pfds.size(); ++i)
+		if (pfds[i].fd == fd) { pfds[i].events &= ~POLLOUT; break; }
+}
+void Server::queueResponse(int fd, const std::string& data)
+{
+	client_state_[fd].outbox.append(data);
+	enableWrite(fd);
 }
 
 	// Server

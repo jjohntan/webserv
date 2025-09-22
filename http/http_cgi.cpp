@@ -4,23 +4,24 @@
 #include <dirent.h>
 #include <sstream>
 #include <iostream>
+#include "../Server.hpp" // [ADD] need full type for srv.queueResponse
 
-// Enforce allowed_methods, redirects, error pages, 413 limit, and static DELETE
-// add near top of file (helpers)
-static const Location* getMatchingLocation(const std::string& path, const ServerConfig* sc)
-{
-	if (!sc) return NULL;
-	const Location* best = NULL;
-	size_t best_len = 0;
-	for (size_t i = 0; i < sc->locations.size(); ++i) {
-		const Location& L = sc->locations[i];
-		if (path.find(L.path) == 0 && L.path.length() > best_len) {
-			best = &L;
-			best_len = L.path.length();
-		}
-	}
-	return best;
-}
+// // Enforce allowed_methods, redirects, error pages, 413 limit, and static DELETE
+// // add near top of file (helpers)
+// static const Location* getMatchingLocation(const std::string& path, const ServerConfig* sc)
+// {
+// 	if (!sc) return NULL;
+// 	const Location* best = NULL;
+// 	size_t best_len = 0;
+// 	for (size_t i = 0; i < sc->locations.size(); ++i) {
+// 		const Location& L = sc->locations[i];
+// 		if (path.find(L.path) == 0 && L.path.length() > best_len) {
+// 			best = &L;
+// 			best_len = L.path.length();
+// 		}
+// 	}
+// 	return best;
+// }
 
 // static bool methodAllowed(const HTTPRequest& req, const Location* L)
 // {
@@ -63,7 +64,7 @@ static std::string loadErrorPageBody(int code, const ServerConfig* sc)
 	return os.str();
 }
 
-static void sendError( int code, const std::string& message, int socketFD, const ServerConfig* sc, const HTTPRequest* req)
+static void sendError( int code, const std::string& message, int socketFD, const ServerConfig* sc, const HTTPRequest* req, Server& srv) // [CHANGE]
 {
 	std::string body = loadErrorPageBody(code, sc);
 	std::ostringstream len; len << body.size();
@@ -74,7 +75,7 @@ static void sendError( int code, const std::string& message, int socketFD, const
 		full += "Connection: close\r\n";
 	full += "\r\n" + body;
 	HTTPResponse resp(message, code, full, socketFD);
-	resp.sendResponse();
+	srv.queueResponse(socketFD, resp.getRawResponse()); // [CHANGE]
 }
 /* --------------------------------------------------------------------------------------------------------------------------------*/
 
@@ -231,8 +232,162 @@ std::map<std::string, std::string> getCGIExtensions(const std::string& path, con
 	return cgi_extensions;
 }
 
+// case-insensitive header fetch
+std::string getHeaderCI(const std::map<std::string,std::string>& h, const std::string& key) {
+	for (std::map<std::string,std::string>::const_iterator it=h.begin(); it!=h.end(); ++it) {
+		if (it->first.size()==key.size()) {
+			bool eq=true;
+			for (size_t i=0;i<key.size();++i) {
+				if (std::tolower((unsigned char)it->first[i]) != std::tolower((unsigned char)key[i])) { eq=false; break; }
+			}
+			if (eq) return it->second;
+		}
+	}
+	return "";
+}
+
+std::string joinPath(const std::string& dir, const std::string& base) {
+	if (dir.empty()) return base;
+	if (!dir.empty() && (dir[dir.size()-1]=='/' || dir[dir.size()-1]=='\\'))
+		return dir + base;
+	return dir + "/" + base;
+}
+
+// crude filename sanitization: drop any path parts
+static std::string basenameOnly(const std::string& name) {
+	size_t p = name.find_last_of("/\\");
+	if (p != std::string::npos) return name.substr(p+1);
+	return name;
+}
+
+static bool ensureDirExists(const std::string& pathDir) {
+	struct stat st;
+	if (stat(pathDir.c_str(), &st) == 0) return S_ISDIR(st.st_mode);
+	// try to create (posix)
+	return mkdir(pathDir.c_str(), 0755) == 0;
+}
+
+static bool parseMultipartAndExtract(const std::string& body,
+									const std::string& boundary,
+									std::string& filename,
+									std::string& filedata)
+{
+	// Boundary comes like: "----abcdef"; the payload uses "--boundary"
+	std::string b = "--" + boundary;
+	// find first part
+	size_t pos = body.find(b);
+	if (pos == std::string::npos) return false;
+	pos += b.size();
+	if (pos+2 > body.size()) return false;
+	if (body.compare(pos, 2, "\r\n")==0) pos += 2;
+
+	// headers of this part until CRLFCRLF
+	size_t hdr_end = body.find("\r\n\r\n", pos);
+	if (hdr_end == std::string::npos) return false;
+	std::string part_headers = body.substr(pos, hdr_end - pos);
+
+	// Content-Disposition: form-data; name="file"; filename="xxx"
+	{
+		std::string key = "content-disposition:";
+		std::istringstream hs(part_headers);
+		std::string line;
+		while (std::getline(hs, line)) {
+			if (!line.empty() && line[line.size()-1]=='\r') line.erase(line.size()-1,1);
+			std::string lower=line;
+			for (size_t i=0;i<lower.size();++i) lower[i]=std::tolower((unsigned char)lower[i]);
+			if (lower.find(key)==0) {
+				// naive filename="
+				size_t fnp = line.find("filename=");
+				if (fnp != std::string::npos) {
+					size_t q1 = line.find('"', fnp);
+					size_t q2 = (q1==std::string::npos) ? std::string::npos : line.find('"', q1+1);
+					if (q1 != std::string::npos && q2 != std::string::npos && q2 > q1+1) {
+						filename = line.substr(q1+1, q2-q1-1);
+					}
+				}
+				break;
+			}
+		}
+	}
+	if (filename.empty()) return false;
+
+	size_t data_start = hdr_end + 4; // skip CRLFCRLF
+	// data ends at \r\n--boundary
+	size_t term = body.find("\r\n" + b, data_start);
+	if (term == std::string::npos) return false;
+
+	filedata.assign(body.data()+data_start, term - data_start);
+	return true;
+}
+
+bool saveUploadedBody(const HTTPRequest& req,
+					const Location* loc,
+					const ServerConfig* sc,
+					std::string& saved_path,
+					std::string& error)
+{
+	// choose target dir
+	std::string dest_dir;
+	if (loc && !loc->upload_path.empty()) dest_dir = loc->upload_path;
+	else if (sc && !sc->root.empty())     dest_dir = joinPath(sc->root, "upload");
+	else                                  dest_dir = "./upload";
+
+	if (!ensureDirExists(dest_dir)) {
+		error = "upload destination directory does not exist and could not be created";
+		return false;
+	}
+
+	const std::map<std::string,std::string>& H = req.getHeaderMap();
+	std::string ctype = getHeaderCI(H, "content-type");
+	std::string raw   = req.getRawBody();            // full body
+	const std::vector<char>& bodyv = req.getBodyVector();
+
+	std::string filename, data;
+
+	if (ctype.find("multipart/form-data") != std::string::npos) {
+		// extract boundary=...
+		size_t bp = ctype.find("boundary=");
+		if (bp == std::string::npos) { error="multipart with no boundary"; return false; }
+		std::string boundary = ctype.substr(bp+9);
+		// trim quotes if any
+		if (!boundary.empty() && boundary[0]=='"') {
+			size_t q2 = boundary.find('"',1);
+			boundary = (q2==std::string::npos) ? boundary.substr(1) : boundary.substr(1, q2-1);
+		}
+		if (!parseMultipartAndExtract(raw, boundary, filename, data)) {
+			error="failed to parse multipart/form-data";
+			return false;
+		}
+	} else {
+		// octet-stream (or anything else): use whole body and invent a name
+		if (!bodyv.empty()) data.assign(&bodyv[0], bodyv.size());
+		else data = raw;
+
+		// filename hint (optional) via header X-Filename
+		filename = getHeaderCI(H, "x-filename");
+		if (filename.empty()) {
+			std::ostringstream oss;
+			oss << "upload_" << std::time(NULL) << ".bin";
+			filename = oss.str();
+		}
+	}
+
+	filename = basenameOnly(filename);
+	if (filename.empty()) { error="empty filename"; return false; }
+
+	saved_path = joinPath(dest_dir, filename);
+
+	std::ofstream out(saved_path.c_str(), std::ios::binary);
+	if (!out) { error="failed to open destination file for write"; return false; }
+	out.write(data.data(), static_cast<std::streamsize>(data.size()));
+	out.close();
+	if (!out) { error="failed while writing file"; return false; }
+
+	return true;
+}
+
 // Main function to handle CGI checking and file serving
-void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std::vector<ServerConfig>& servers)
+void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std::vector<ServerConfig>& servers, Server& srv) // [CHANGE]
 {
 	std::string path = request.getPath();
 
@@ -260,8 +415,8 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 			std::cout << "Executing CGI Script: " << script_path << std::endl;
 			CGIResult cgi_result = runCGI(request, script_path, cgi_extensions, working_directory);
 			HTTPResponse response(cgi_result.status_message, cgi_result.status_code, cgi_result.content, socketFD);
-			std::cout << "Sending CGI Response Back to Socket\n";
-			response.sendResponse();
+			std::cout << "Queue CGI Response\n";
+			srv.queueResponse(socketFD, response.getRawResponse()); // [CHANGE]
 			return;
 		}
 		// fall-through to static if needsCGI()==false
@@ -291,18 +446,45 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 			if (std::remove(filePath.c_str()) == 0) {
 				std::string content = request.connectionHeader(request.isConnectionAlive()) + "\r\n";
 				HTTPResponse resp("No Content", 204, content, socketFD);
-				resp.sendResponse();
+				srv.queueResponse(socketFD, resp.getRawResponse()); // [CHANGE]
 			}
 			else
-				sendError(403, "Forbidden", socketFD, server_config, &request);
+				sendError(403, "Forbidden", socketFD, server_config, &request, srv); // [CHANGE]
 		}
 		else
-			sendError(404, "Not Found", socketFD, server_config, &request);
+			sendError(404, "Not Found", socketFD, server_config, &request, srv);     // [CHANGE]
 		return ;
 	}
 
-	// Directory request → autoindex or 403
-	if (!filePath.empty() && filePath[filePath.length() - 1] == '/') {
+	// --- Handle POST upload if this location has upload_path configured ---
+	if (request.getMethod() == "POST" && matching_location) {
+		if (!matching_location->upload_path.empty()) {
+			std::string saved, err;
+			if (saveUploadedBody(request, matching_location, server_config, saved, err)) {
+				std::ostringstream ok;
+				ok << "Content-Type: text/plain\r\n"
+				<< request.connectionHeader(request.isConnectionAlive())
+				<< "\r\n"
+				<< "Uploaded to: " << saved << "\n";
+				HTTPResponse resp("OK", 200, ok.str(), socketFD);
+				srv.queueResponse(socketFD, resp.getRawResponse());
+			} else {
+				// Config has upload_path but we failed to store → 500
+				std::string body = "<html><body><h1>500</h1><p>" + err + "</p></body></html>";
+				std::ostringstream out;
+				out << "Content-Type: text/html\r\n"
+					<< request.connectionHeader(request.isConnectionAlive()) << "\r\n"
+					<< body;
+				HTTPResponse resp("Internal Server Error", 500, out.str(), socketFD);
+				srv.queueResponse(socketFD, resp.getRawResponse());
+			}
+			return; // handled POST
+		}
+		// If no upload_path here, fall through to static/CGI rules
+	}
+
+	// Directory request → only list on GET (others fall through)
+	if (request.getMethod() == "GET" && !filePath.empty() && filePath[filePath.length() - 1] == '/') {
 		bool autoindex_enabled = (matching_location ? matching_location->autoindex : false);
 		if (autoindex_enabled) {
 			std::string dirListing = generateDirectoryListing(filePath);
@@ -311,17 +493,17 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 										+ request.connectionHeader(request.isConnectionAlive()) + "\r\n"
 										+ dirListing;
 			HTTPResponse response("OK", 200, responseContent, socketFD);
-			response.sendResponse();
+			srv.queueResponse(socketFD, response.getRawResponse()); // [CHANGE]
 		}
 		else
-			sendError(403, "Forbidden", socketFD, server_config, &request);
+			sendError(403, "Forbidden", socketFD, server_config, &request, srv);     // [CHANGE]
 		return;
 	}
 
 	// Regular file
 	std::string content = serveFile(filePath);
 	if (content.empty()) {
-		sendError(404, "Not Found", socketFD, server_config, &request);
+		sendError(404, "Not Found", socketFD, server_config, &request, srv);         // [CHANGE]
 		return;
 	}
 
@@ -337,5 +519,5 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 								+ request.connectionHeader(request.isConnectionAlive()) + "\r\n"
 								+ content;
 	HTTPResponse response("OK", 200, responseContent, socketFD);
-	response.sendResponse();
-	}
+	srv.queueResponse(socketFD, response.getRawResponse()); // [CHANGE]
+}

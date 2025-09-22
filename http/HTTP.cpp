@@ -1,11 +1,14 @@
+// Use the same helpers the router uses
 #include "HTTP.hpp"
 #include "http_cgi.hpp"
+#include "../Server.hpp"
 #include <poll.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>      // close
 #include <sys/socket.h>  // recv
 #include <sstream>
+#include "../Server.hpp"
 
 const ServerConfig* getActiveServer(const std::vector<ServerConfig>& serverConfig)
 {
@@ -53,9 +56,9 @@ bool	methodAllowed(const HTTPRequest &request, const Location *Location)
 	return (false);
 }
 
-bool	checkAllowedMethod(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig)
+bool	checkAllowedMethod(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig, Server& srv) // [CHANGE]
 {
-	const ServerConfig *active = getActiveServer(serverConfig);
+	const ServerConfig *active = findServerConfig(request, serverConfig);
 	if (!active) 
 		return (false);
 
@@ -78,11 +81,8 @@ bool	checkAllowedMethod(const HTTPRequest &request, int socketFD, const std::vec
 		std::string extra = "Allow: " + allow.str() + "\r\n";
 		extra += request.connectionHeader(request.isConnectionAlive());
 
-		ErrorResponse resp(405, "Method Not Allowed",
-							*active,
-							extra,
-							socketFD);
-		resp.sendResponse();
+		ErrorResponse resp(405, "Method Not Allowed", *active, extra, socketFD);              // [CHANGE]
+		srv.queueResponse(socketFD, resp.getRawResponse()); 
 		return (true);
 	}
 	return (false);
@@ -91,9 +91,9 @@ bool	checkAllowedMethod(const HTTPRequest &request, int socketFD, const std::vec
 /*
 	413 Payload Too Large (client_max_body_size enforcement)
 */
-bool	checkPayLoad(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig)
+bool	checkPayLoad(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig, Server& srv) // [CHANGE]
 {
-	const ServerConfig *active = getActiveServer(serverConfig);
+	const ServerConfig *active = findServerConfig(request, serverConfig);
 	if (!active)
 		return (false);
 	if (active->client_max_body_size > 0)
@@ -103,8 +103,8 @@ bool	checkPayLoad(const HTTPRequest &request, int socketFD, const std::vector<Se
 		{
 			// Provide Connection header matching keep-alive decision
 			std::string extra = request.connectionHeader(request.isConnectionAlive());
-			ErrorResponse resp(413, "Payload Too Large", *active, extra, socketFD);
-			resp.sendResponse();
+			ErrorResponse resp(413, "Payload Too Large", *active, extra, socketFD);           // [CHANGE]
+			srv.queueResponse(socketFD, resp.getRawResponse());                               // [ADD]
 			return (true);
 		}
 	}
@@ -136,9 +136,9 @@ const char* reasonPhrase(int code)
 		redirect_code (301, 302, 303, 307, 308)
 		redirect_url (where to send the client)
 */
-bool	checkRedirectResponse(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig)
+bool	checkRedirectResponse(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig, Server& srv) // [CHANGE]
 {
-	const ServerConfig* active = getActiveServer(serverConfig);
+	const ServerConfig* active = findServerConfig(request, serverConfig);
 	if (!active)
 		return (false);
 	std::string	path = request.getPath();
@@ -172,8 +172,8 @@ bool	checkRedirectResponse(const HTTPRequest &request, int socketFD, const std::
 		if (include_body)
 			out << body;
 
-		HTTPResponse resp(reason, code, out.str(), socketFD);
-		resp.sendResponse();
+		HTTPResponse resp(reason, code, out.str(), socketFD);                                          // [CHANGE]
+		srv.queueResponse(socketFD, resp.getRawResponse()); 
 		return (true);
 	}
 	return (false);
@@ -195,7 +195,7 @@ void	printRequest(const HTTPRequest &request)
 	std::cout << request.getRawBody() << std::endl;
 }
 
-void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::vector<struct pollfd>& fds, size_t &i, const std::vector<ServerConfig>& servers)
+void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::vector<struct pollfd>& fds, size_t &i, const std::vector<ServerConfig>& servers, Server& srv) // [CHANGE]
 {
 	char	buffer[READ_BYTES] = {0};
 	ssize_t	read_bytes = recv(socketFD, buffer, READ_BYTES, 0);
@@ -211,7 +211,7 @@ void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::v
 	}
 	std::string	data(buffer, read_bytes);
 	bool	isClearing = false;
-	isClearing = processClientData(socketFD, requestMap, data, servers);
+	isClearing = processClientData(socketFD, requestMap, data, servers, srv); // [CHANGE]
 	if (isClearing == true)
 	{
 		// Remove client socket from poll set and the map
@@ -228,7 +228,7 @@ void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::v
 	client sends multiple requests back-to-back on the same TCP connection without waiting for the previous response	
 */
 
-bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::string	data, const std::vector<ServerConfig>& servers)
+bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::string data, const std::vector<ServerConfig>& servers, Server& srv) // [CHANGE]
 {
 	try
 	{
@@ -241,9 +241,9 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 			std::cout << "Request From Socket " << socketFD << " had successfully converted into object!\n";
 			printRequest(req);
 
-			if (checkAllowedMethod(req, socketFD, servers) ||
-				checkPayLoad(req, socketFD, servers) ||
-				checkRedirectResponse(req, socketFD, servers))
+			if (checkAllowedMethod(req, socketFD, servers, srv) ||          // [CHANGE]
+				checkPayLoad(req, socketFD, servers, srv) ||                // [CHANGE]
+				checkRedirectResponse(req, socketFD, servers, srv))         // [CHANGE]
 			{
 				bool closeIt = !req.isConnectionAlive();
 				if (closeIt)
@@ -262,7 +262,7 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 			}
 
 			// normal response path
-			handleRequestProcessing(req, socketFD, servers);
+			handleRequestProcessing(req, socketFD, servers, srv); // [CHANGE] queues internally
 			bool closeIt = !req.isConnectionAlive();
 			if (closeIt) 
 				return (true);
@@ -283,18 +283,31 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 	catch (const std::exception &e)
 	{
 		std::cerr << "Error while processing client data from socket "
-					<< socketFD << ": " << e.what() << "\n";
+				<< socketFD << ": " << e.what() << "\n";
 
-		const ServerConfig* active = getActiveServer(servers);
+		// Try to derive the right server config from what we know about this fd
+		const ServerConfig* active = NULL;
+
+		// If we still have a request object for this fd, try to use its Host header
+		std::map<int, HTTPRequest>::const_iterator it = requestMap.find(socketFD);
+		if (it != requestMap.end())
+		{
+			// findServerConfig is declared in http_cgi.hpp (which you already include)
+			active = findServerConfig(it->second, servers);
+		}
+
+		// Fallback: if nothing resolved, use the first configured server
+		if (!active && !servers.empty())
+			active = &servers[0];
+
 		if (active)
 		{
-			// Use your ErrorResponse: resolves error_pages[400] under sc->root
 			ErrorResponse err(400, "Bad Request", *active, socketFD);
-			err.sendResponse();
+			srv.queueResponse(socketFD, err.getRawResponse());
 		}
 		else
 		{
-			// Fallback if no server config available
+			// Last-resort literal response (no config available)
 			const std::string body =
 				"<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>"
 				"<title>400 Bad Request</title></head><body>"
@@ -304,8 +317,9 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 				<< "Connection: close\r\n\r\n"
 				<< body;
 			HTTPResponse err("Bad Request", 400, out.str(), socketFD);
-			err.sendResponse();
+			srv.queueResponse(socketFD, err.getRawResponse());
 		}
-		return (true); // on parser error, close is OK/safer
+
+		return (true); // close the connection on parser error
 	}
 }

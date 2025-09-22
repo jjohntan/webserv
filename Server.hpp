@@ -26,6 +26,10 @@ class Server
 		std::vector<ServerConfig> servers; // configurations parsed from config file
 		// stored root for single-server compatibility (optional)
 		std::string root;
+
+		// [ADD] Per-client write buffer (outbox)
+		struct ClientState { std::string outbox; };
+		std::map<int, ClientState> client_state_; // by client fd  // [ADD]
 		
 		// helper
 		void addNewConnection(int listen_fd, std::map<int, HTTPRequest> &request_map);
@@ -34,6 +38,9 @@ class Server
 		void addPfds(int client_fd);
 		void removePfds(int i);
 		bool isListeningSocket(int fd);
+		void enableWrite(int fd);   // [ADD]
+		void disableWrite(int fd);  // [ADD]
+
 	public:
 		// default constructor
 		Server();
@@ -46,6 +53,7 @@ class Server
 		int createListeningSocket(const std::string& port_str);
 		void run();
 		bool start();
+		void queueResponse(int fd, const std::string& data); // [ADD]
 };
 
 #endif

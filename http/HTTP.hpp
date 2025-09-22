@@ -20,21 +20,24 @@
 # include <map>
 # include <string>
 
+// [ADD] forward declaration to avoid circular includes
+class Server;
+
 const ServerConfig* getActiveServer(const std::vector<ServerConfig>& serverConfig);
 const Location* getMatchingLocation(const std::string& path,
 									const std::vector<ServerConfig>& serverConfig);
 
 const	Location* getMatchingLocation(const std::string &path, const ServerConfig* servercConfig);
 bool	methodAllowed(const HTTPRequest &request, const Location *Location);
-bool	checkAllowedMethod(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig);
-bool	checkPayLoad(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig);
+bool	checkAllowedMethod(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig, Server& srv); // [CHANGE]
+bool	checkPayLoad(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig, Server& srv);       // [CHANGE]
 const char* reasonPhrase(int code);
-bool	checkRedirectResponse(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig);
+bool	checkRedirectResponse(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig, Server& srv); // [CHANGE]
 
 
 void	printRequest(const HTTPRequest &req);
 // std::string	generateResponseBody(); // for hardcoded body
-void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::vector<struct pollfd>& fds, size_t &i, const std::vector<ServerConfig>& servers);
-bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::string	data, const std::vector<ServerConfig>& servers);
+void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::vector<struct pollfd>& fds, size_t &i, const std::vector<ServerConfig>& servers, Server& srv); // [CHANGE]
+bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::string data, const std::vector<ServerConfig>& servers, Server& srv); // [CHANGE]
 
 #endif
