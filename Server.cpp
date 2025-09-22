@@ -37,6 +37,11 @@ void Server::addNewConnection(int listen_fd, std::map<int, HTTPRequest> &request
 	}
 	else
 	{
+		// [ADD] make client non-blocking
+		int flags = fcntl(client_fd, F_GETFL, 0);
+		if (flags != -1) 
+			fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);  // [ADD]
+
 		// [ADD] Optional: leave blocking; poll() ensures readiness.
 		// If you switch to nonblocking, DO NOT inspect errno after send/read.
 		addPfds(client_fd);
@@ -64,7 +69,7 @@ void Server::run()
 	std::map<int, HTTPRequest> request_map;
 
 	std::cout << "waiting for connections" << std::endl;
-	while (true)
+	while (g_running) // [CHANGE] use your SIGINT flag to exit the loop cleanly
 	{
 		int ready_fd = poll(pfds.data(), pfds.size(), -1);
 		if (ready_fd < 0)
@@ -75,6 +80,17 @@ void Server::run()
 
 		for (size_t i = 0; i < pfds.size(); i++)
 		{
+			 // Handle error-y revents (prevents “mystery hangs”)
+			if (pfds[i].revents & (POLLERR | POLLNVAL)) {     // [ADD]
+				int fd = pfds[i].fd;                          // [ADD]
+				close(fd);                                    // [ADD]
+				client_state_.erase(fd);                      // [ADD]
+				request_map.erase(fd);                        // [ADD]
+				pfds.erase(pfds.begin() + i);                 // [ADD]
+				--i;                                          // [ADD]
+				continue;                                     // [ADD]
+			}                                                 // [ADD]
+
 			// [ADD] Handle exactly one write OR one read per client per poll tick
 			if (pfds[i].revents & POLLOUT)
 			{
@@ -105,7 +121,7 @@ void Server::run()
 								// do not touch pfds[i].revents after erase        // [ADD]
 								continue;                                          // [ADD]
 							}
-						disableWrite(fd); // switch back to read-only
+							disableWrite(fd); // switch back to read-only
 						}
 					}
 					else
