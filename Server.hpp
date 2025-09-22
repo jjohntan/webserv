@@ -26,6 +26,8 @@ class Server
 		std::vector<ServerConfig> servers; // configurations parsed from config file
 		// stored root for single-server compatibility (optional)
 		std::string root;
+		std::map<int, time_t> last_activity; //track last activity per fd
+		int timeout;
 
 		// [ADD] Per-client write buffer + close-after-write flag
 		struct ClientState { std::string outbox; bool close_after_write; };
@@ -55,6 +57,8 @@ class Server
 		bool start();
 		void queueResponse(int fd, const std::string& data); // [ADD]
 		void markCloseAfterWrite(int fd); // [ADD]
+		friend void readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::vector<struct pollfd>& fds, size_t &i, const std::vector<ServerConfig>& servers, Server& srv);
+
 };
 
 #endif

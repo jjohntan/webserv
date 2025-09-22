@@ -78,6 +78,33 @@ void Server::run()
 			break;
 		}
 
+		size_t current_time = time(NULL);
+		for (size_t i = 0; i < pfds.size(); i++)
+			{
+				int fd = pfds[i].fd;
+				if (last_activity.count(fd) && 
+					(current_time - last_activity[fd] > timeout))
+				{
+					std::cout << "Timeout closing fd " << fd << " (idle for " 
+							<< (current_time - last_activity[fd]) << "s)" << std::endl;
+					
+					// Send 408 response if possible
+					if (client_state_.count(fd) && !client_state_[fd].outbox.empty()) {
+						// Try to send pending data quickly
+						send(fd, client_state_[fd].outbox.data(), 
+							client_state_[fd].outbox.size(), MSG_DONTWAIT);
+					}
+					
+					// Clean up
+					close(fd);
+					client_state_.erase(fd);
+					request_map.erase(fd);
+					last_activity.erase(fd);
+					removePfds(i);
+					--i; // Adjust index after removal
+					continue;
+				}
+			}
 		for (size_t i = 0; i < pfds.size(); i++)
 		{
 			 // Handle error-y revents (prevents “mystery hangs”)
@@ -136,6 +163,7 @@ void Server::run()
 					}
 				}
 				pfds[i].revents = 0;
+				last_activity[fd] = time(NULL);
 				continue; // one write OR one read per poll tick                   // [ADD]
 			}
 

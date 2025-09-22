@@ -219,6 +219,10 @@ void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::v
 		--i; // Decrement to not skip element after erase
 		return ;
 	}
+	if (read_bytes > 0)
+	{
+		srv.last_activity[socketFD] = time(NULL);
+	}
 	std::string	data(buffer, read_bytes);
 	bool	isClearing = false;
 	isClearing = processClientData(socketFD, requestMap, data, servers, srv); // [CHANGE]
