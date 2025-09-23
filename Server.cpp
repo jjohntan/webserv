@@ -40,6 +40,15 @@ void signalHandler(int signum)
 	g_running = false;
 }
 
+void setupSignalHandler() {
+    struct sigaction sa;
+    sa.sa_handler = signalHandler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+}
+
 /**
  * Remove a file descriptor at a give index from the set
  */
@@ -105,11 +114,12 @@ bool Server::isListeningSocket(int fd)
 void Server::run()
 {
 	std::map<int, HTTPRequest> request_map;
+	setupSignalHandler();
 
 	std::cout << "waiting for connections" << std::endl;
-	while (g_running) // [CHANGE] use your SIGINT flag to exit the loop cleanly
+	while (g_running)
 	{
-		int ready_fd = poll(pfds.data(), pfds.size(), 1000);
+		int ready_fd = poll(pfds.data(), pfds.size(), 100);
 		if (ready_fd < 0)
 		{
 			perror("poll failed");
@@ -127,8 +137,7 @@ void Server::run()
 				
 			if (last_activity.count(fd) && (current_time - last_activity[fd] > timeout))
 			{
-				std::cout << "Timeout closing fd " << fd << " (idle for " 
-						<< (current_time - last_activity[fd]) << "s)" << std::endl;
+				std::cout << "Timeout closing fd " << fd << " (idle for " << (current_time - last_activity[fd]) << "s)" << std::endl;
 				
 				// Send proper 408 timeout response
 				sendTimeoutResponse(fd);
@@ -236,6 +245,8 @@ void Server::run()
 
 	// Clear the pollfd vector
 	pfds.clear();
+	client_state_.clear();
+	last_activity.clear();
 
 	std::cout << "Server shut down gracefully" << std::endl;
 }
