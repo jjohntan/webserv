@@ -4,11 +4,27 @@
 
 void sendTimeoutResponse(int fd)
 {
+    // Read the 408.html file
+    std::ifstream file("408.html");
+    std::string body;
+    
+    if (file.is_open()) {
+        body = std::string((std::istreambuf_iterator<char>(file)), 
+                          std::istreambuf_iterator<char>());
+        file.close();
+    } else {
+        body = "<html><body><h1>408 Request Timeout</h1></body></html>";
+    }
+    
+    // Use stringstream for number to string conversion
+    std::stringstream ss;
+    ss << body.length();
+    
     std::string response = "HTTP/1.1 408 Request Timeout\r\n"
                           "Connection: close\r\n"
-                          "Content-Type: text/plain\r\n"
-                          "Content-Length: 19\r\n\r\n"
-                          "408 Request Timeout";
+                          "Content-Type: text/html\r\n"
+                          "Content-Length: " + ss.str() + "\r\n\r\n" +
+                          body;
     
     send(fd, response.c_str(), response.length(), MSG_DONTWAIT);
     std::cout << "Sent 408 timeout response to fd " << fd << std::endl;
@@ -84,7 +100,7 @@ void Server::run()
 	std::cout << "waiting for connections" << std::endl;
 	while (g_running) // [CHANGE] use your SIGINT flag to exit the loop cleanly
 	{
-		int ready_fd = poll(pfds.data(), pfds.size(), -1);
+		int ready_fd = poll(pfds.data(), pfds.size(), 1000);
 		if (ready_fd < 0)
 		{
 			perror("poll failed");
@@ -209,13 +225,6 @@ void Server::run()
 		}
 	}
 
-	// // Close server socket
-	// if (sockfd >= 0)
-	// {
-	//     close(sockfd);
-	//     sockfd = -1;
-	// }
-
 	// Clear the pollfd vector
 	pfds.clear();
 
@@ -335,7 +344,7 @@ Server::Server()
 }
 
 Server::Server(int port, const std::string& root, const std::vector<ServerConfig>& servers)
-: servers(servers), root(root)
+: servers(servers), root(root), timeout(15)
 {
 	(void)port; // legacy single-port ctor keeps signature but real ports come from servers vector
 }
