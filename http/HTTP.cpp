@@ -215,9 +215,15 @@ void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::v
 		// Remove client socket from poll set and the map
 		close(socketFD);
 		requestMap.erase(socketFD);
+		srv.client_state_.erase(socketFD);
+		srv.last_activity.erase(socketFD);
 		fds.erase(fds.begin() + i);
 		--i; // Decrement to not skip element after erase
 		return ;
+	}
+	if (read_bytes > 0)
+	{
+		srv.last_activity[socketFD] = time(NULL);
 	}
 	std::string	data(buffer, read_bytes);
 	bool	isClearing = false;
@@ -227,6 +233,8 @@ void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::v
 		// Remove client socket from poll set and the map
 		close(socketFD);
 		requestMap.erase(socketFD);
+		srv.client_state_.erase(socketFD);
+		srv.last_activity.erase(socketFD);
 		fds.erase(fds.begin() + i);
 		--i; // Decrement to not skip element after erase
 	}
