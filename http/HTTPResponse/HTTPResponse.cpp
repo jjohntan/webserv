@@ -299,7 +299,8 @@ void HTTPResponse::ensureContentLength()
 {
 	// If there is no body, keep headers as-is (e.g., 204/HEAD/no-body responses).
 	// Caller should have added Content-Length appropriately.
-	if (_body.empty()) return;
+	if (_body.empty())
+		return;
 
 	// Rebuild header without any existing Content-Length (case-insensitive),
 	// then append the correct one computed from _body.size().
@@ -309,7 +310,9 @@ void HTTPResponse::ensureContentLength()
 	while (std::getline(hs, line))
 	{
 		// keep CR stripping logic consistent with separateHeaderBody()
-		if (!line.empty() && line[line.size() - 1] == '\r') line.erase(line.size() - 1, 1);
+		std::string::size_type n = line.size();
+		if (n > 0 && line[n - 1] == '\r')
+			line.erase(n - 1, 1);
 		std::string lower = line;
 		for (size_t i = 0; i < lower.size(); ++i)
 			lower[i] = std::tolower(static_cast<unsigned char>(lower[i]));

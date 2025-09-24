@@ -308,6 +308,17 @@ void ConfigParser::parseLocationDirective(const std::string& line, Location& loc
             std::cout << "    Warning: Invalid redirect code " << code << std::endl;
         }
     }
+    else if (directive == "redirect_code") {
+        int code; iss >> code;
+        if (validateRedirectCode(code))
+            location.redirect_code = code;
+    }
+    else if (directive == "redirect_url") {
+        std::string url; iss >> url;
+        if (!url.empty() && url[url.size()-1] == ';') 
+            url.erase(url.size()-1);
+        location.redirect_url = url;
+    }
 }
 
 // Validation methods
