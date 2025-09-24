@@ -6,8 +6,8 @@ WEBSERVER = webserver
 
 # Source files
 SOURCES = main.cpp \
-          Server.cpp \
-          Server.cpp \
+          server/Server.cpp \
+          server/Server.cpp \
           config_files/config.cpp \
           cgi_handler/cgi.cpp \
           http/HTTP.cpp \
@@ -18,7 +18,7 @@ SOURCES = main.cpp \
 
 # Object files
 OBJECTS = main.o \
-          Server.o \
+          server/Server.o \
           config.o \
           cgi.o \
           HTTP.o \
@@ -28,8 +28,8 @@ OBJECTS = main.o \
 		  ErrorResponse.o \
 
 # Header files
-HEADERS = Server.hpp \
-HEADERS = Server.hpp \
+HEADERS = server/Server.hpp \
+HEADERS = server/Server.hpp \
           config_files/config.hpp \
           cgi_handler/cgi.hpp \
           http/HTTPRequest/HTTPRequest.hpp \
@@ -47,12 +47,12 @@ $(WEBSERVER): $(OBJECTS)
 	@echo "Web server build complete! Executable: $(WEBSERVER)"
 
 # Object file dependencies
-main.o: main.cpp Server.hpp config_files/config.hpp
-main.o: main.cpp Server.hpp config_files/config.hpp
+main.o: main.cpp server/Server.hpp config_files/config.hpp
+main.o: main.cpp server/Server.hpp config_files/config.hpp
 	$(CXX) $(CXXFLAGS) -c main.cpp -o main.o
 
-server.o: Server.cpp Server.hpp cgi_handler/cgi.hpp http/HTTPRequest/HTTPRequest.hpp http/HTTPResponse/HTTPResponse.hpp config_files/config.hpp http/HTTP.hpp http/http_cgi.hpp
-	$(CXX) $(CXXFLAGS) -c Server.cpp -o server.o
+server.o: server/Server.cpp server/Server.hpp cgi_handler/cgi.hpp http/HTTPRequest/HTTPRequest.hpp http/HTTPResponse/HTTPResponse.hpp config_files/config.hpp http/HTTP.hpp http/http_cgi.hpp
+	$(CXX) $(CXXFLAGS) -c server/Server.cpp -o server.o
 
 config.o: config_files/config.cpp config_files/config.hpp
 	$(CXX) $(CXXFLAGS) -c config_files/config.cpp -o config.o

@@ -1,14 +1,13 @@
 // Use the same helpers the router uses
 #include "HTTP.hpp"
 #include "http_cgi.hpp"
-#include "../Server.hpp"
+#include "../server/Server.hpp"
 #include <poll.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>      // close
 #include <sys/socket.h>  // recv
 #include <sstream>
-#include "../Server.hpp"
 
 const ServerConfig* getActiveServer(const std::vector<ServerConfig>& serverConfig)
 {

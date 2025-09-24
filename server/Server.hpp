@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <string.h>
-#include "config_files/config.hpp"
+#include "../config_files/config.hpp"
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -14,8 +14,8 @@
 #include <iostream>
 #include <set>
 #include <fcntl.h>
-#include "http/HTTP.hpp"
-#include "http/HTTPRequest/HTTPRequest.hpp"
+#include "../http/HTTP.hpp"
+#include "../http/HTTPRequest/HTTPRequest.hpp"
 
 
 class Server

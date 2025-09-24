@@ -8,7 +8,7 @@
 #include <iostream>
 #include <sys/stat.h>
 #include <unistd.h>
-#include "../Server.hpp" 
+#include "../server/Server.hpp" 
 
 
 static void stripCgiStatusHeader(std::string& headersAndBody)
