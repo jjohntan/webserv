@@ -140,7 +140,6 @@ print("<pre>curl -X DELETE http://localhost:8081/cgi_bin/hello.py</pre>")
 print("<h2>Navigation:</h2>")
 print("<ul>")
 print("<li><a href='/'>Back to Home</a></li>")
-print("<li><a href='/cgi_bin/hello.py?test=simple'>Simple GET test</a></li>")
 print("<li><a href='/upload/'>Upload Directory</a></li>")
 print("</ul>")
 

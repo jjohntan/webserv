@@ -10,6 +10,9 @@
 #include <sys/stat.h>
 #include <cstdio>
 
+// Forward declaration to avoid circular includes
+class Server;
+
 // CGI and file serving functions
 CGIResult runCGI(const HTTPRequest& request, const std::string& script_path, const std::map<std::string, std::string>& cgi_extensions, const std::string& working_directory);
 std::string serveFile(const std::string& filePath);
