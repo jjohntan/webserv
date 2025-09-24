@@ -1,56 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# ---------------------------------------------------------
-# Webserv regression tester (extended for mandatory checks)
-# ---------------------------------------------------------
-# Env overrides:
-#   CFG_FILE   - path to config (default: testconfig/test.conf)
-#   BIN        - explicit binary path (default tries ./webserv ./webserver ./a.out)
-#   REDIR_PATH - path that should redirect (e.g., /old). If unset, redirect test is skipped.
-#   VHOST      - a server_name for virtual-host test on :8080 (e.g., example.com). If unset, skipped.
-#   SIEGE_C    - siege clients (default 25)
-#   SIEGE_T    - siege duration (default 10S)
-#
-# Ports used here must match your config:
-#   8080: static site, upload, methods
-#   8081: CGI
-#   8082: tiny body limit for 413 test
-# ---------------------------------------------------------
-
 # -----------------------------
-# Config (override via env vars)
+# Helper functions (define first)
 # -----------------------------
-CFG_FILE="${CFG_FILE:-testconfig/test.conf}"
-LOG_FILE="${LOG_FILE:-server_test.log}"
-BIN_CANDIDATES=( "${BIN:-}" ./webserv ./webserver ./a.out )
-PORTS=(8080 8081 8082)
-HOST="127.0.0.1"
-STARTUP_WAIT_SECS=6       # how long to wait for ports
-CURL_TIMEOUT=6
-TMP_DIR="$(mktemp -d -t webserv-tests-XXXXXX)"
-trap 'cleanup' EXIT INT TERM
-
-cleanup() {
-  set +e
-  [[ -n "${SERVER_PID:-}" ]] && kill "${SERVER_PID}" 2>/dev/null || true
-  [[ -n "${NC_TMP:-}" ]] && rm -f "$NC_TMP" 2>/dev/null || true
-  sleep 0.2
-  for p in "${PORTS[@]}"; do
-    kill_port_listeners "$p" || true
-  done
-  rm -rf "$TMP_DIR" >/dev/null 2>&1 || true
-}
-
 say()   { printf "%s\n" "$*"; }
 skip()  { say "[SKIP] $*"; }
 pass()  { say "[PASS] $*"; }
 fail()  { say "[FAIL] $*"; ((FAILS++)) || true; }
 fatal() { say "[FATAL] $*"; exit 1; }
-
-# -----------------------------
-# Helpers
-# -----------------------------
 
 have_cmd() { command -v "$1" >/dev/null 2>&1; }
 
@@ -75,11 +33,11 @@ kill_port_listeners() {
   local port="$1" pid
   local killed=0
   while read -r pid; do
-    [[ -z "$pid" ]] && continue
-    if [[ "${SERVER_PID:-}" == "$pid" ]]; then
+    [[ -z "${pid}" ]] && continue
+    if [[ "${SERVER_PID:-}" == "${pid}" ]]; then
       continue
     fi
-    kill "$pid" 2>/dev/null && killed=1
+    kill "${pid}" 2>/dev/null && killed=1
   done < <( { port_pids_lsof "$port"; port_pids_ss "$port"; } | sort -u )
   [[ $killed -eq 1 ]] && sleep 0.1
   if curl -sS -m 0.3 "http://${HOST}:${port}/" >/dev/null 2>&1; then
@@ -101,11 +59,11 @@ wait_port_up() {
 
 # Always return a code, even if curl errors (prints 000)
 curl_code() {
-  curl -sS -o /dev/null -m "$CURL_TIMEOUT" -w '%{http_code}' "$@" 2>/dev/null || echo 000
+  curl -sS -o /dev/null -m "${CURL_TIMEOUT}" -w '%{http_code}' "$@" 2>/dev/null || echo 000
 }
 # Never crash the script if body fetch fails
 curl_body() {
-  curl -sS -m "$CURL_TIMEOUT" "$@" || true
+  curl -sS -m "${CURL_TIMEOUT}" "$@" || true
 }
 
 # Single raw HTTP TCP shot (requires nc)
@@ -125,6 +83,33 @@ need_build() {
 }
 
 # -----------------------------
+# Config (override via env vars)
+# -----------------------------
+CFG_FILE="${CFG_FILE:-testconfig/test.conf}"
+LOG_FILE="${LOG_FILE:-server_test.log}"
+BIN_CANDIDATES=( "${BIN:-}" ./webserv ./webserver ./a.out )
+PORTS=(8080 8081 8082 8083)
+HOST="127.0.0.1"
+STARTUP_WAIT_SECS=6
+CURL_TIMEOUT=6
+TMP_DIR="$(mktemp -d -t webserv-tests-XXXXXX)"
+
+# -----------------------------
+# Cleanup + trap (set trap AFTER vars)
+# -----------------------------
+cleanup() {
+  set +e
+  [[ -n "${SERVER_PID:-}" ]] && kill "${SERVER_PID}" 2>/dev/null || true
+  [[ -n "${NC_TMP:-}" ]] && rm -f "$NC_TMP" 2>/dev/null || true
+  sleep 0.2
+  for p in "${PORTS[@]}"; do
+    kill_port_listeners "$p" || true
+  done
+  rm -rf "$TMP_DIR" >/dev/null 2>&1 || true
+}
+trap 'cleanup' EXIT INT TERM
+
+# -----------------------------
 # Locate binary
 # -----------------------------
 BIN_PATH=""
@@ -141,7 +126,6 @@ if [[ -z "${BIN_PATH}" ]] && [[ -f Makefile ]]; then
   done
 fi
 [[ -x "${BIN_PATH:-}" ]] || fatal "Could not find server binary (expected ./webserv, ./webserver, or ./a.out)."
-
 [[ -f "$CFG_FILE" ]] || fatal "Config file not found: ${CFG_FILE}"
 
 # -----------------------------
@@ -280,7 +264,7 @@ fi
 # 9) DELETE file (8080)
 DEL_NAME="tmp_delete_$(date +%s).txt"
 echo "please delete me" > "${TMP_DIR}/${DEL_NAME}"
-curl -sS -m "$CURL_TIMEOUT" -o /dev/null -X POST -F "file=@${TMP_DIR}/${DEL_NAME};filename=${DEL_NAME}" "http://${HOST}:8080/upload/" || true
+curl -sS -m "${CURL_TIMEOUT}" -o /dev/null -X POST -F "file=@${TMP_DIR}/${DEL_NAME};filename=${DEL_NAME}" "http://${HOST}:8080/upload/" || true
 code=$(curl_code -X DELETE "http://${HOST}:8080/upload/${DEL_NAME}")
 if [[ "$code" == "204" ]]; then
   pass "DELETE file"
@@ -294,10 +278,6 @@ else
   fail "DELETE file (got $code expected 204)"
 fi
 
-# ------------------------------------------------------------------
-# Extended mandatory checks from subject + evaluation sheet
-# ------------------------------------------------------------------
-
 # 10) UNKNOWN method should not crash; expect 405 or 501
 code=$(curl_code -X FOO "http://${HOST}:8080/")
 if [[ "$code" == "405" || "$code" == "501" ]]; then
@@ -307,7 +287,7 @@ else
 fi
 
 # 11) HEAD method on static should return headers and no body (Content-Length honored)
-head_headers="$(curl -sS -D - -o /dev/null -m "$CURL_TIMEOUT" -X HEAD "http://${HOST}:8080/")" || true
+head_headers="$(curl -sS -D - -o /dev/null -m "${CURL_TIMEOUT}" -X HEAD "http://${HOST}:8080/")" || true
 if grep -qi '^HTTP/1\.[01] 200' <<<"$head_headers"; then
   if grep -qi '^content-length:' <<<"$head_headers"; then
     pass "HEAD returns 200 with Content-Length"
@@ -349,7 +329,7 @@ else
   skip "Method control (DELETE /) expected 405/403; got $code (config-dependent)"
 fi
 
-# 15) Default error pages: ensure error bodies are HTML-ish (subject: must have defaults)
+# 15) Default error pages: ensure error bodies are HTML-ish
 code=$(curl_code "http://${HOST}:8080/this_path_should_not_exist_$(date +%s)")
 err_body="$(curl_body "http://${HOST}:8080/this_path_should_not_exist_$(date +%s)")"
 if [[ "$code" == "404" ]]; then
@@ -362,13 +342,38 @@ else
   fail "Default error page: expected 404, got $code"
 fi
 
-# 16) Redirect route (config-dependent)
-REDIR_PATH="${REDIR_PATH:-/redirect}"
-redir_code=$(curl_code -I "http://${HOST}:8080${REDIR_PATH}")
-if [[ "$redir_code" == "301" || "$redir_code" == "302" ]]; then
-  pass "Redirect returns ${redir_code}"
-else
-  skip "Redirect test skipped (set REDIR_PATH to a configured redirect; got $redir_code)"
+# 16) Redirect matrix (8083)
+REDIR_HOST_PORT="http://${HOST}:8083"
+declare -a REDIR_CASES=(
+  "/moved|301|/"
+  "/found|302|/images/test.jpg"
+  "/see-other|303|/"
+  "/temp|307|/upload/"
+  "/perm|308|/"
+)
+ran_any=0
+for case in "${REDIR_CASES[@]}"; do
+  IFS='|' read -r path exp_code exp_loc <<<"$case"
+  url="${REDIR_HOST_PORT}${path}"
+  code=$(curl_code -I "${url}")
+  if [[ "$code" == "$exp_code" ]]; then
+    ran_any=1
+    loc=$(curl -sSI "${url}" | awk -F': ' '/^Location:/ {print $2}' | tr -d '\r')
+    if [[ -z "$loc" ]]; then
+      fail "Redirect ${path} → ${code} but missing Location header"
+      continue
+    fi
+    if [[ "$loc" != "$exp_loc" && "$loc" != "${REDIR_HOST_PORT}${exp_loc}" ]]; then
+      fail "Redirect ${path}: expected Location '${exp_loc}', got '${loc}'"
+    else
+      pass "Redirect ${path} → ${code} (Location: ${loc})"
+    fi
+  else
+    fail "Redirect ${path}: expected ${exp_code}, got ${code}"
+  fi
+done
+if [[ "${ran_any}" -eq 0 ]]; then
+  skip "Redirect matrix: none matched (is redirect server on :8083 configured and running?)"
 fi
 
 # 17) Server names / virtual hosts on same port (config-dependent)
@@ -383,7 +388,7 @@ else
   skip "Virtual host check skipped (set VHOST=your.server.name)"
 fi
 
-# 18) CGI POST (form) on 8081 (subject: CGI must work with GET and POST)
+# 18) CGI POST (form) on 8081
 cgip_code=$(curl_code -X POST -F "name=webserv" "http://${HOST}:8081/cgi_bin/hello.py")
 if [[ "$cgip_code" == "200" ]]; then
   pass "CGI POST returns 200"
@@ -391,13 +396,13 @@ else
   fail "CGI POST (got $cgip_code expected 200)"
 fi
 
-# 19) Upload then GET back the exact file and verify bytes echo (binary-safe small file)
+# 19) Upload then GET back the exact file and verify bytes echo
 UP_FILE="${TMP_DIR}/echo.bin"
 printf "WS-echo-%s" "$(date +%s)" > "$UP_FILE"
 UP_NAME="echo_$(date +%s).bin"
 up_code=$(curl_code -X POST -F "file=@${UP_FILE};filename=${UP_NAME}" "http://${HOST}:8080/upload/")
 if [[ "$up_code" == "200" || "$up_code" == "201" ]]; then
-  got="$(curl -sS -m "$CURL_TIMEOUT" "http://${HOST}:8080/upload/${UP_NAME}" || true)"
+  got="$(curl -sS -m "${CURL_TIMEOUT}" "http://${HOST}:8080/upload/${UP_NAME}" || true)"
   if [[ "$got" == "$(cat "$UP_FILE")" ]]; then
     pass "Upload+GET back exact bytes"
   else
@@ -418,15 +423,15 @@ else
   fail "Directory traversal not blocked (got $tr_code)"
 fi
 
-# 22) Connection close honored when client asks (Connection: close)
-close_hdrs="$(curl -sS -D - -o /dev/null -m "$CURL_TIMEOUT" -H 'Connection: close' "http://${HOST}:8080/")" || true
+# 22) Connection close honored when client asks
+close_hdrs="$(curl -sS -D - -o /dev/null -m "${CURL_TIMEOUT}" -H 'Connection: close' "http://${HOST}:8080/")" || true
 if grep -qi '^connection: close' <<<"$close_hdrs"; then
   pass "Connection: close honored"
 else
   fail "Connection: close not present in response headers"
 fi
 
-# 23) Static DELETE forbidden outside allowed route (/about.html should not be deletable)
+# 23) Static DELETE forbidden outside allowed route
 code=$(curl_code -X DELETE "http://${HOST}:8080/about.html")
 if [[ "$code" == "405" || "$code" == "403" ]]; then
   pass "DELETE protected for non-upload resource"

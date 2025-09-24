@@ -379,16 +379,42 @@ Server::~Server()
 }
 
 // ============================ Helpers ============================  // [ADD]
+
+/*
+	Tell poll() that you have something to write
+	"|=" adds bits without removing the current one
+*/
 void Server::enableWrite(int fd)
 {
 	for (size_t i = 0; i < pfds.size(); ++i)
-		if (pfds[i].fd == fd) { pfds[i].events |= POLLOUT; break; }
+	{
+		if (pfds[i].fd == fd) 
+		{
+			pfds[i].events |= POLLOUT; 
+			break;
+		}
+	}
 }
 
+/*
+	Tell poll() that you have nothing to write
+	"~Flags" means inverse the bits
+
+	Suppose POLLIN = 0b0001, POLLOUT = 0b0100.
+	Current events = 0b0101 (POLLIN + POLLOUT).
+	~POLLOUT = 0b1011.
+	events & ~POLLOUT = 0b0101 & 0b1011 = 0b0001 → POLLOUT cleared, POLLIN kept.
+*/
 void Server::disableWrite(int fd)
 {
 	for (size_t i = 0; i < pfds.size(); ++i)
-		if (pfds[i].fd == fd) { pfds[i].events &= ~POLLOUT; break; }
+	{
+		if (pfds[i].fd == fd)
+		{
+			pfds[i].events &= ~POLLOUT;
+			break;
+		}
+	}
 }
 
 void Server::queueResponse(int fd, const std::string& data)
