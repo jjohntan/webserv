@@ -35,11 +35,10 @@ class Server
 		
 		// helper
 		void addNewConnection(int listen_fd, std::map<int, HTTPRequest> &request_map);
-		// void readClientData(int i);
-		// void	readClientData(std::map<int, HTTPRequest>& requestMap, size_t &i);
 		void addPfds(int client_fd);
 		void removePfds(int i);
 		bool isListeningSocket(int fd);
+		void checkTimeOut(std::map<int, HTTPRequest> request_map);
 		void enableWrite(int fd);   // [ADD]
 		void disableWrite(int fd);  // [ADD]
 

@@ -110,24 +110,10 @@ bool Server::isListeningSocket(int fd)
 	return false;
 }
 
-// Main loop
-void Server::run()
+void Server::checkTimeOut(std::map<int, HTTPRequest> request_map)
 {
-	std::map<int, HTTPRequest> request_map;
-	setupSignalHandler();
-
-	std::cout << "waiting for connections" << std::endl;
-	while (g_running)
-	{
-		int ready_fd = poll(pfds.data(), pfds.size(), 100);
-		if (ready_fd < 0)
-		{
-			perror("poll failed");
-			break;
-		}
-
-		time_t current_time = time(NULL);
-		for (size_t i = 0; i < pfds.size(); i++)
+	time_t current_time = time(NULL);
+	for (size_t i = 0; i < pfds.size(); i++)
 		{
 			int fd = pfds[i].fd;
 			
@@ -152,6 +138,24 @@ void Server::run()
 				continue;
 			}
 		}
+}
+
+// Main loop
+void Server::run()
+{
+	std::map<int, HTTPRequest> request_map;
+	setupSignalHandler();
+
+	std::cout << "waiting for connections" << std::endl;
+	while (g_running)
+	{
+		int ready_fd = poll(pfds.data(), pfds.size(), 100);
+		if (ready_fd < 0)
+		{
+			perror("poll failed");
+			break;
+		}
+		checkTimeOut(request_map);
 		for (size_t i = 0; i < pfds.size(); i++)
 		{
 			 // Handle error-y revents (prevents “mystery hangs”)
@@ -272,7 +276,7 @@ int Server::createListeningSocket(const std::string& port_str)
 
 	int sockfd = -1;
 	
-	// loop through all the result s and bind to the first we can
+	// loop through all the results and bind to the first we can
 	for (ptr = ai; ptr != NULL; ptr = ptr->ai_next)
 	{
 		// make a socket using the information from getaddrinfo()
@@ -420,6 +424,6 @@ void Server::markCloseAfterWrite(int fd)
 	//    |
 	// recv
 	//    |
-	// send
+	// send(POLLOUT)
 	//    |
 	// recv
