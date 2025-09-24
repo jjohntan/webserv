@@ -38,7 +38,9 @@ static void sendError(int code, const std::string& message, int socketFD, const 
 {
 	if (!sc) {
 		// Fallback for no server config
-		std::string body = "<html><body><h1>" + std::to_string(code) + "</h1></body></html>";
+		std::ostringstream oss;
+		oss << "<html><body><h1>" << code << "</h1></body></html>";
+		std::string body = oss.str();
 		std::string full = "Content-Type: text/html\r\nConnection: close\r\n\r\n" + body;
 		HTTPResponse resp(message, code, full, socketFD);
 		srv.queueResponse(socketFD, resp.getRawResponse());
