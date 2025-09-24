@@ -6,6 +6,8 @@
 #include <dirent.h>
 #include <sstream>
 #include <iostream>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "../Server.hpp" 
 
 
@@ -168,6 +170,163 @@ std::map<std::string, std::string> getCGIExtensions(const std::string& path, con
 
 
 
+// Helper function to parse multipart form data and extract file content
+std::string parseMultipartData(const std::string& body, const std::string& boundary, std::string& filename) {
+	if (boundary.empty()) {
+		return "";
+	}
+	
+	// Find the boundary in the body
+	std::string full_boundary = "--" + boundary;
+	size_t boundary_pos = body.find(full_boundary);
+	if (boundary_pos == std::string::npos) {
+		return "";
+	}
+	
+	// Find the end of headers (double CRLF)
+	size_t header_end = body.find("\r\n\r\n", boundary_pos);
+	if (header_end == std::string::npos) {
+		return "";
+	}
+	
+	// Extract filename from Content-Disposition header
+	std::string headers = body.substr(boundary_pos, header_end - boundary_pos);
+	size_t filename_pos = headers.find("filename=\"");
+	if (filename_pos != std::string::npos) {
+		filename_pos += 10; // Skip "filename=\""
+		size_t filename_end = headers.find("\"", filename_pos);
+		if (filename_end != std::string::npos) {
+			filename = headers.substr(filename_pos, filename_end - filename_pos);
+		}
+	}
+	
+	// Extract file content (after headers, before next boundary)
+	size_t content_start = header_end + 4; // Skip \r\n\r\n
+	size_t next_boundary = body.find(full_boundary, content_start);
+	if (next_boundary == std::string::npos) {
+		// No next boundary, take until end
+		return body.substr(content_start);
+	}
+	
+	// Remove trailing \r\n before next boundary
+	std::string content = body.substr(content_start, next_boundary - content_start);
+	if (content.length() >= 2 && content.substr(content.length() - 2) == "\r\n") {
+		content = content.substr(0, content.length() - 2);
+	}
+	
+	return content;
+}
+
+// Helper function to handle file uploads (POST)
+bool handleFileUpload(const HTTPRequest& request, const std::string& upload_path, int socketFD, const ServerConfig* server_config, Server& srv) {
+	std::string body = request.getRawBody();
+	if (body.empty()) {
+		sendError(400, "Bad Request", socketFD, server_config, &request, srv);
+		return false;
+	}
+	
+	// Create upload directory if it doesn't exist
+	if (access(upload_path.c_str(), F_OK) != 0) {
+		if (mkdir(upload_path.c_str(), 0755) != 0) {
+			sendError(500, "Internal Server Error", socketFD, server_config, &request, srv);
+			return false;
+		}
+	}
+	
+	// Check if it's multipart/form-data
+	std::string content_type = "";
+	std::map<std::string, std::string> headers = request.getHeaderMap();
+	std::map<std::string, std::string>::const_iterator ct_it = headers.find("content-type");
+	if (ct_it != headers.end()) {
+		content_type = ct_it->second;
+	}
+	
+	std::string filename = "";
+	std::string file_content = "";
+	
+	if (content_type.find("multipart/form-data") != std::string::npos) {
+		// Parse multipart data
+		size_t boundary_pos = content_type.find("boundary=");
+		if (boundary_pos != std::string::npos) {
+			std::string boundary = content_type.substr(boundary_pos + 9);
+			file_content = parseMultipartData(body, boundary, filename);
+		}
+	} else {
+		// Simple binary upload
+		file_content = body;
+		// Extract filename from path
+		filename = request.getPath();
+		size_t last_slash = filename.find_last_of('/');
+		if (last_slash != std::string::npos) {
+			filename = filename.substr(last_slash + 1);
+		}
+	}
+	
+	if (filename.empty()) {
+		// Generate a unique filename
+		std::ostringstream oss;
+		oss << "upload_" << time(NULL) << ".bin";
+		filename = oss.str();
+	}
+	
+	if (file_content.empty()) {
+		sendError(400, "Bad Request", socketFD, server_config, &request, srv);
+		return false;
+	}
+	
+	std::string file_path = upload_path + "/" + filename;
+	
+	// Write file
+	std::ofstream file(file_path.c_str(), std::ios::binary);
+	if (!file.is_open()) {
+		sendError(500, "Internal Server Error", socketFD, server_config, &request, srv);
+		return false;
+	}
+	
+	file.write(file_content.c_str(), file_content.size());
+	file.close();
+	
+	// Send success response
+	std::string response_content = "Content-Type: text/plain\r\n"
+								 + request.connectionHeader(request.isConnectionAlive()) + "\r\n"
+								 + "File uploaded successfully: " + filename;
+	HTTPResponse response("Created", 201, response_content, socketFD);
+	srv.queueResponse(socketFD, response.getRawResponse());
+	return true;
+}
+
+// Helper function to handle file deletion (DELETE)
+bool handleFileDeletion(const HTTPRequest& request, const std::string& server_root, int socketFD, const ServerConfig* server_config, Server& srv) {
+	std::string path = request.getPath();
+	
+	// For upload directory, use the upload path instead of server root
+	std::string file_path;
+	if (path.find("/upload/") == 0) {
+		// This is an upload file, use the upload directory
+		file_path = "./pages/upload" + path.substr(7); // Remove "/upload" prefix
+	} else {
+		file_path = server_root + path;
+	}
+	
+	// Check if file exists
+	if (access(file_path.c_str(), F_OK) != 0) {
+		sendError(404, "Not Found", socketFD, server_config, &request, srv);
+		return false;
+	}
+	
+	// Delete the file
+	if (unlink(file_path.c_str()) != 0) {
+		sendError(500, "Internal Server Error", socketFD, server_config, &request, srv);
+		return false;
+	}
+	
+	// Send success response (204 No Content)
+	std::string response_content = request.connectionHeader(request.isConnectionAlive()) + "\r\n";
+	HTTPResponse response("No Content", 204, response_content, socketFD);
+	srv.queueResponse(socketFD, response.getRawResponse());
+	return true;
+}
+
 // Main function to handle CGI checking and file serving
 void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std::vector<ServerConfig>& servers, Server& srv) // [CHANGE]
 {
@@ -221,9 +380,26 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 		filePath = server_root + path;
 	}
 
-	// Only support GET and HEAD methods for static content
-	if (request.getMethod() != "GET" && request.getMethod() != "HEAD") {
+	// Check if the method is allowed for this location
+	if (!methodAllowed(request, matching_location)) {
 		sendError(405, "Method Not Allowed", socketFD, server_config, &request, srv);
+		return;
+	}
+
+	// Handle POST requests (file upload)
+	if (request.getMethod() == "POST") {
+		if (matching_location && !matching_location->upload_path.empty()) {
+			handleFileUpload(request, matching_location->upload_path, socketFD, server_config, srv);
+			return;
+		} else {
+			sendError(400, "Bad Request", socketFD, server_config, &request, srv);
+			return;
+		}
+	}
+
+	// Handle DELETE requests (file deletion)
+	if (request.getMethod() == "DELETE") {
+		handleFileDeletion(request, server_root, socketFD, server_config, srv);
 		return;
 	}
 
