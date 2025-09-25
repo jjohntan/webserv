@@ -122,6 +122,11 @@ const std::string &HTTPRequest::getPath() const
 	return (this->_path);
 }
 
+const std::string &HTTPRequest::getQueryString() const
+{
+	return (this->_query);
+}
+
 const std::string &HTTPRequest::getVersion() const
 {
 	return (this->_version);
@@ -170,7 +175,17 @@ void HTTPRequest::setMethod(const std::string &method)
 
 void HTTPRequest::setPath(const std::string &path)
 {
-	this->_path = path;
+	// Always store PATH **without** query (defensive)
+	size_t q = path.find('?');
+	if (q == std::string::npos)
+		this->_path = path;
+	else
+		this->_path = path.substr(0, q);
+}
+
+void HTTPRequest::setQueryString(const std::string &query)
+{
+	this->_query = query;
 }
 
 void HTTPRequest::setVersion(const std::string &version)
@@ -230,13 +245,45 @@ void	HTTPRequest::processRequestLine(std::string &line)
 	this->_request_line = line;
 	std::istringstream	line_stream(line);
 	std::string	method;
-	std::string	path;
+	std::string target;   // may contain '?'
 	std::string	version;
 
-	line_stream >> method >> path >> version;
+	line_stream >> method >> target >> version;
 	this->_method = method;
-	this->_path = path;
 	this->_version = version;
+
+	// Split request-target into path + query (RFC 9112 §3.2)
+	// We only support origin-form "path?query" here (which is what your server uses).
+	// Any fragment ('#...') is ignored by HTTP and should never be sent.
+	if (target.empty())
+	{
+		_path.clear();
+		_query.clear();
+		return;
+	}
+	// Absolute-form (proxy) or asterisk-form (*) fallbacks:
+	// If it's "*", treat as root.
+	if (target == "*")
+	{
+		_path = "/*";
+		_query.clear();
+		return;
+	}
+	// Normal case: origin-form "/path[?query]"
+	size_t qpos = target.find('?');
+	if (qpos == std::string::npos)
+	{
+		_path = target;
+		_query.clear();
+	}
+	else
+	{
+		_path  = target.substr(0, qpos);
+		_query = target.substr(qpos + 1);
+	}
+	// Ensure path is non-empty; treat empty as "/"
+	if (_path.empty())
+		_path = "/";
 }
 
 /*
@@ -543,6 +590,7 @@ void HTTPRequest::resetForNextRequest()
 	_request_line_len = 0;
 	_method.clear();
 	_path.clear();
+	_query.clear();
 	_version.clear();
 }
 
