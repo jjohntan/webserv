@@ -52,6 +52,7 @@ class	HTTPRequest
 		size_t	_request_line_len;
 		std::string	_method;
 		std::string	_path;
+		std::string	_query;
 		std::string	_version;
 
 		void	extractRequestLine();
@@ -94,6 +95,7 @@ class	HTTPRequest
 		bool isChunked() const;
 		const std::string &getMethod() const;
 		const std::string &getPath() const;
+		const std::string &getQueryString() const;
 		const std::string &getVersion() const;
 		const int &getSocketFD() const;
 
@@ -106,6 +108,7 @@ class	HTTPRequest
 		void setBodyVector(const std::vector<char> &body);
 		void setMethod(const std::string &method);
 		void setPath(const std::string &path);
+		void setQueryString(const std::string &query);
 		void setVersion(const std::string &version);
 		void setSocketFD(const int &socketFD);
 

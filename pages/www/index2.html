@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WebServ • Welcome</title>
+  <meta name="description" content="Simple demo hub for WebServ with upload, redirect, and delete actions." />
+  <style>
+    :root{
+      --bg:#f7fafc; --card:#ffffff; --txt:#1c2540; --muted:#64748b; --border:#e6ecf2;
+      --accent:#4f8cff; --accent-2:#2dd4bf; --accent-3:#f59e0b; --danger:#ef4444;
+      --radius:18px; --shadow:0 14px 40px rgba(20,32,60,.08); --shadow-sm:0 6px 20px rgba(20,32,60,.06);
+      --focus:0 0 0 3px rgba(79,140,255,.25);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      color:var(--txt);
+      background:
+        radial-gradient(1200px 800px at -10% -10%, #e9f2ff 0%, transparent 70%) no-repeat,
+        radial-gradient(1200px 800px at 110% 10%, #eafff9 0%, transparent 70%) no-repeat,
+        var(--bg);
+      line-height:1.65; padding:28px 18px;
+    }
+    .wrap{max-width:1060px;margin:0 auto}
+    header{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:18px}
+    .title{font-size:clamp(26px,4.2vw,40px); font-weight:800; letter-spacing:.2px}
+    .subtitle{color:var(--muted); font-size:15px}
+
+    .card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:22px}
+    .card h2{margin:0 0 14px 0; font-size:18px; letter-spacing:.2px; color:#304c89}
+
+    .tiles{display:grid; gap:16px; grid-template-columns:1fr}
+    @media(min-width:680px){ .tiles{grid-template-columns:1fr 1fr} }
+    @media(min-width:980px){ .tiles{grid-template-columns:1fr 1fr 1fr 1fr} }
+
+    .tile{
+      display:flex; flex-direction:column; gap:14px; padding:22px;
+      background:linear-gradient(180deg,#ffffff, #fbfdff);
+      border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sm);
+      text-decoration:none; color:var(--txt); transition:transform .08s ease, border-color .15s ease, box-shadow .15s ease, background .2s ease;
+      min-height:150px;
+    }
+    .tile:hover{transform:translateY(-2px); border-color:#d9e7ff}
+    .tile:focus{outline:none; box-shadow:var(--focus)}
+    .ico{width:56px;height:56px;border-radius:14px;display:grid;place-items:center;font-size:28px;font-weight:700;border:1px solid var(--border)}
+    .ico.blue{background:#eff5ff;border-color:#dbe8ff;color:#2253c8}
+    .ico.mint{background:#effdf8;border-color:#d6f4ec;color:#0f8c76}
+    .ico.warm{background:#fff7eb;border-color:#ffe5c4;color:#a35a00}
+    .ico.red{background:#fff2f2;border-color:#ffd6d6;color:#b01616}
+    .t-title{font-size:18px;font-weight:800;letter-spacing:.2px}
+    .t-desc{color:var(--muted); font-size:14px; line-height:1.55}
+    .t-cta{margin-top:auto;font-weight:700;font-size:14px;color:#304c89}
+
+    footer{margin-top:22px; text-align:center; font-size:13px; color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <div class="title">Welcome to WebServ</div>
+        <div class="subtitle">Peaceful, simple hub to test upload, redirect, and delete actions.</div>
+      </div>
+    </header>
+
+    <!-- 1) Pages & Redirects -->
+    <section class="card" aria-labelledby="pages-redirects">
+      <h2 id="pages-redirects">Pages & Redirects</h2>
+      <div class="tiles" role="group" aria-label="Pages and redirect actions" style="grid-template-columns:1fr 1fr">
+        <a class="tile" href="/about2.html" aria-label="Open About page">
+          <div class="ico warm">ℹ</div>
+          <div class="t-title">About</div>
+          <div class="t-desc">Simple static page to verify HTML/CSS routing.</div>
+          <div class="t-cta">Open →</div>
+        </a>
+
+        <a class="tile" href="/cgi_bin/redirect.py" aria-label="Run redirect CGI">
+          <div class="ico mint">↪</div>
+          <div class="t-title">Test Redirect</div>
+          <div class="t-desc">Exercise 3xx behavior from a CGI endpoint to validate redirect logic.</div>
+          <div class="t-cta">Open →</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- 2) Directory Management -->
+    <section class="card" style="margin-top:16px" aria-labelledby="dir-mgmt">
+      <h2 id="dir-mgmt">Directory Management</h2>
+      <div class="tiles" role="group" aria-label="Directory management actions" style="grid-template-columns:1fr 1fr 1fr">
+        <a class="tile" href="/cgi_bin/upload2.py" aria-label="Run upload CGI">
+          <div class="ico blue">＋</div>
+          <div class="t-title">Upload File</div>
+          <div class="t-desc">Open the upload handler (CGI). Use this to test POST with file data.</div>
+          <div class="t-cta">Open →</div>
+        </a>
+
+
+        <a class="tile" href="/upload/" aria-label="Browse Upload directory">
+          <div class="ico warm">🗂</div>
+          <div class="t-title">Browse /upload/</div>
+          <div class="t-desc">View files created by uploads. Requires autoindex enabled for this path.</div>
+          <div class="t-cta">Open →</div>
+        </a>
+
+		<a class="tile" href="/cgi_bin/delete_upload_files.py" aria-label="Delete files in Upload directory">
+			<div class="ico red">🗑</div>
+			<div class="t-title">Delete File</div>
+			<div class="t-desc">Select files from /upload/ and remove them safely.</div>
+			<div class="t-cta">Open →</div>
+		</a>
+
+    </section>
+
+    <!-- 3) Card Management -->
+    <section class="card" style="margin-top:16px" aria-labelledby="card-mgmt">
+      <h2 id="card-mgmt">Card Management</h2>
+      <div class="tiles" role="group" aria-label="Profile actions" style="grid-template-columns:1fr 1fr 1fr">
+        <a class="tile" href="/form.html" aria-label="Register a new profile">
+          <div class="ico mint">🧾</div>
+          <div class="t-title">Register Card</div>
+          <div class="t-desc">Open the profile form to add a new entry.</div>
+          <div class="t-cta">Go to form.html →</div>
+        </a>
+
+        <a class="tile" href="/viewcard.html" aria-label="View profile cards">
+          <div class="ico blue">👁</div>
+          <div class="t-title">View Cards</div>
+          <div class="t-desc">Browse up to 9 saved profiles in a colorful grid. Search & edit inline.</div>
+          <div class="t-cta">Open viewcard.html →</div>
+        </a>
+
+        <a class="tile" href="/deletecards.html" aria-label="Delete profile cards">
+          <div class="ico red">✖</div>
+          <div class="t-title">Delete Cards</div>
+          <div class="t-desc">Open a list of saved cards and remove any by pressing the × button.</div>
+          <div class="t-cta">Open delete list →</div>
+        </a>
+      </div>
+    </section>
+
+    <footer>WebServ • C++98 • poll() • RFC 9110–9112</footer>
+  </div>
+</body>
+</html>

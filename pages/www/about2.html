@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WebServ • About</title>
+  <meta name="description" content="Notes and quick references for the WebServ project." />
+  <style>
+    :root{
+      --bg:#f7fafc; --card:#ffffff; --txt:#1c2540; --muted:#64748b; --border:#e6ecf2;
+      --accent:#4f8cff; --accent-2:#2dd4bf; --accent-3:#f59e0b; --danger:#ef4444;
+      --radius:18px; --shadow:0 14px 40px rgba(20,32,60,.08); --shadow-sm:0 6px 20px rgba(20,32,60,.06);
+      --focus:0 0 0 3px rgba(79,140,255,.25);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      color:var(--txt);
+      background:
+        radial-gradient(1200px 800px at -10% -10%, #e9f2ff 0%, transparent 70%) no-repeat,
+        radial-gradient(1200px 800px at 110% 10%, #eafff9 0%, transparent 70%) no-repeat,
+        var(--bg);
+      line-height:1.65; padding:28px 18px;
+    }
+    .wrap{max-width:1060px;margin:0 auto}
+    header{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:18px}
+    .title{font-size:clamp(26px,4.2vw,40px); font-weight:800; letter-spacing:.2px}
+    .subtitle{color:var(--muted); font-size:15px}
+
+    .card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:22px}
+    .card h2{margin:0 0 12px 0; font-size:20px; letter-spacing:.2px; color:#304c89; display:flex; align-items:center; gap:10px}
+    .pill{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid var(--border); border-radius:999px; font-size:12px; color:#304c89; background:#f5f8ff}
+    .kawaii{font-size:22px}
+
+    .grid{display:grid; gap:16px}
+    @media(min-width:780px){ .grid.two{grid-template-columns:1fr 1fr} .grid.three{grid-template-columns:1fr 1fr 1fr} }
+
+    .list{margin:0; padding-left:18px}
+    .muted{color:var(--muted)}
+    .callout{border:1px dashed var(--border); background:#fbfdff; padding:12px 14px; border-radius:12px; margin-top:10px}
+    .kbd{font:500 12px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; border:1px solid var(--border); padding:2px 6px; border-radius:6px; background:#fff}
+
+    pre{
+      margin:10px 0 0 0; border:1px solid var(--border); background:#0f172acc; color:#e6e9f0;
+      border-radius:14px; box-shadow:var(--shadow-sm); overflow:auto; padding:14px;
+      font:500 13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    }
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+    .mini{font-size:12px; color:var(--muted)}
+    footer{margin-top:22px; text-align:center; font-size:13px; color:var(--muted)}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:14px; justify-content:center}
+    .btn{
+      appearance:none; border:1px solid var(--border); background:#ffffff; color:var(--txt);
+      padding:10px 14px; border-radius:12px; cursor:pointer; text-decoration:none; font-weight:700; box-shadow:var(--shadow-sm);
+      transition:transform .08s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease; font-size:14px;
+    }
+    .btn:hover{transform:translateY(-1px); border-color:#d8e4f2}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <div class="title">About WebServ <span class="kawaii">✨🧩</span></div>
+        <div class="subtitle">A tiny C++98 HTTP/1.1 server with poll(), CGI, uploads, and clean routing.</div>
+      </div>
+      <span class="pill">RFC 9110–9112 • non-blocking • poll()</span>
+    </header>
+
+    <!-- Config files -->
+    <section class="card">
+      <h2><span class="kawaii">⚙️</span> Config files</h2>
+      <p class="muted">Human-readable server blocks inspired by nginx. Each block defines <em>listen</em>, <em>server_name</em>, <em>root</em>, <em>locations</em>, and policies like <em>allowed_methods</em>, <em>client_max_body_size</em>, and <em>error_page</em>.</p>
+      <div class="grid two">
+        <div>
+          <strong>Example snippet</strong>
+          <pre><code>server {
+  listen 127.0.0.1:8080;
+  server_name localhost;
+  root ./pages/www;
+  client_max_body_size 10M;
+
+  error_page 404 /error/404.html;
+
+  location /upload/ {
+    root ./pages;
+    allowed_methods GET POST DELETE;
+    upload_path ./pages/upload;
+    autoindex on;
+  }
+}</code></pre>
+        </div>
+        <div class="callout">
+          <strong>Tips</strong>
+          <ul class="list">
+            <li>Longest-prefix match selects the <code>location</code>.</li>
+            <li>Per-location <code>allowed_methods</code> gate requests early.</li>
+            <li><code>upload_path</code> is used by CGI to store files.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- TCP connection and port -->
+    <section class="card">
+      <h2><span class="kawaii">📡</span> TCP connection &amp; port</h2>
+      <div class="grid two">
+        <div>
+          <ul class="list">
+            <li><strong>Bind:</strong> <code>socket()</code> → <code>fcntl(O_NONBLOCK)</code> → <code>bind()</code> → <code>listen()</code></li>
+            <li><strong>Port reuse:</strong> <code>setsockopt(SO_REUSEADDR)</code> for quick restarts</li>
+            <li><strong>Accept loop:</strong> non-blocking <code>accept()</code> for new clients</li>
+            <li><strong>Keep-Alive:</strong> respect <code>Connection</code> semantics per RFC 9112</li>
+          </ul>
+        </div>
+        <div class="callout"><span class="kawaii">🧸</span> <strong>Heads up</strong>
+          <div class="mini">Prefer one listening socket per <code>listen ip:port</code>. Track client states by FD.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Server socket and poll(), flags -->
+    <section class="card">
+      <h2><span class="kawaii">🧯</span> Server socket &amp; poll(), flags</h2>
+      <div class="grid two">
+        <div>
+          <strong>pollfd flags</strong>
+          <ul class="list">
+            <li><code>POLLIN</code> – data to read / new connections</li>
+            <li><code>POLLOUT</code> – socket ready to send response</li>
+            <li><code>POLLERR</code>, <code>POLLNVAL</code>, <code>POLLHUP</code> – close &amp; cleanup</li>
+          </ul>
+        </div>
+        <div>
+          <strong>Loop sketch</strong>
+          <pre><code>// 1) poll(pfds, timeout)
+// 2) if listener readable -> accept()
+// 3) if client POLLIN -> recv() &amp; parse HTTP
+// 4) if client POLLOUT -> send buffered response
+// 5) on ERR/HUP/NVAL -> close fd, remove state</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- HTTP Request examples -->
+    <section class="card">
+      <h2><span class="kawaii">📨</span> HTTP Request (raw)</h2>
+      <p class="muted">Minimal GET and a POST with body (note CRLF line ends).</p>
+      <div class="grid two">
+        <div>
+          <strong>GET</strong>
+          <pre><code>GET /images/logo.png HTTP/1.1
+Host: localhost:8080
+User-Agent: curl/8.7
+Accept: */*
+
+</code></pre>
+        </div>
+        <div>
+          <strong>POST (multipart)</strong>
+          <pre><code>POST /cgi_bin/upload2.py HTTP/1.1
+Host: localhost:8080
+Content-Type: multipart/form-data; boundary=----X
+Content-Length: 12345
+
+------X
+Content-Disposition: form-data; name="file"; filename="cat.png"
+Content-Type: image/png
+
+...binary...
+------X--</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- HTTP Response examples -->
+    <section class="card">
+      <h2><span class="kawaii">📦</span> HTTP Response (raw)</h2>
+      <div class="grid two">
+        <div>
+          <strong>200 OK</strong>
+          <pre><code>HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+Content-Length: 1287
+Connection: keep-alive
+
+&lt;!doctype html&gt;...body...</code></pre>
+        </div>
+        <div>
+          <strong>301 Redirect</strong>
+          <pre><code>HTTP/1.1 301 Moved Permanently
+Location: /new/path
+Content-Length: 0
+Connection: close
+
+</code></pre>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>Keep-Alive</strong>: add <code>Connection: keep-alive</code> and include a correct <code>Content-Length</code>. For chunked transfers, omit <code>Content-Length</code> and stream with <code>Transfer-Encoding: chunked</code>.
+      </div>
+    </section>
+
+    <!-- Routing & Execution -->
+    <section class="card">
+      <h2><span class="kawaii">🗺️</span> Routing &amp; Execution</h2>
+      <div class="grid two">
+        <div>
+          <ul class="list">
+            <li>Map URL → best <code>location</code> (longest-prefix).</li>
+            <li>Static file: build filesystem path with <code>root</code> + URI.</li>
+            <li>Directory: serve <code>index</code> or autoindex (if enabled).</li>
+            <li>CGI path: spawn script via <code>fork/execve</code>, pass CGI env, stream body.</li>
+          </ul>
+        </div>
+        <div>
+          <strong>Decision flow</strong>
+          <pre><code>parse request
+→ match server/location
+→ check allowed_methods &amp; size
+→ (redirect?) → 3xx
+→ (cgi?) → run script → capture stdout
+→ else → static file or 404
+→ build response headers/body
+→ send</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- CGI scripts -->
+    <section class="card">
+      <h2><span class="kawaii">🐍</span> CGI scripts</h2>
+      <div class="grid two">
+        <div>
+          <strong>Environment basics</strong>
+          <ul class="list">
+            <li><code>REQUEST_METHOD</code>, <code>CONTENT_TYPE</code>, <code>CONTENT_LENGTH</code></li>
+            <li><code>SCRIPT_NAME</code>, <code>QUERY_STRING</code>, <code>PATH_INFO</code></li>
+            <li><code>UPLOAD_DIR</code> (custom) to steer upload location</li>
+          </ul>
+          <div class="callout">
+            <span class="kawaii">💡</span> CGI <em>must</em> print headers first, e.g.
+            <span class="kbd">Content-Type: text/html</span><span class="kbd">CRLF</span><span class="kbd">CRLF</span> then body.
+          </div>
+        </div>
+        <div>
+          <strong>Tiny Python CGI skeleton</strong>
+          <pre><code>#!/usr/bin/env python3
+import os, sys
+sys.stdout.write("Content-Type: text/html\\r\\n\\r\\n")
+sys.stdout.write("&lt;h1&gt;Hello CGI&lt;/h1&gt;")</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <a class="btn" href="/index2.html">Back to Home</a>
+      </div>
+    </section>
+
+    <footer>WebServ • C++98 • poll() • RFC 9110–9112</footer>
+  </div>
+</body>
+</html>
