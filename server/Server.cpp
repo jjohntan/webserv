@@ -40,13 +40,14 @@ void signalHandler(int signum)
 	g_running = false;
 }
 
-void setupSignalHandler() {
-    struct sigaction sa;
-    sa.sa_handler = signalHandler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sigaction(SIGINT, &sa, NULL);
-    sigaction(SIGTERM, &sa, NULL);
+void setupSignalHandler()
+{
+	struct sigaction sa;
+	sa.sa_handler = signalHandler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+	sigaction(SIGINT, &sa, NULL);
+	sigaction(SIGTERM, &sa, NULL);
 }
 
 /**
@@ -83,17 +84,17 @@ void Server::addNewConnection(int listen_fd, std::map<int, HTTPRequest> &request
 	}
 	else
 	{
-		// [ADD] make client non-blocking
+		// make client non-blocking
 		int flags = fcntl(client_fd, F_GETFL, 0);
 		if (flags != -1) 
-			fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);  // [ADD]
+			fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
 
-		// [ADD] Optional: leave blocking; poll() ensures readiness.
+		// Optional: leave blocking; poll() ensures readiness.
 		// If you switch to nonblocking, DO NOT inspect errno after send/read.
 		addPfds(client_fd);
-		requestMap[client_fd] = HTTPRequest(client_fd); // create new HTTPRequest if haven't
-		client_state_[client_fd] = ClientState();       // [ADD] init outbox
-		client_state_[client_fd].close_after_write = false; // [ADD]
+		requestMap[client_fd] = HTTPRequest(client_fd);// create new HTTPRequest if haven't
+		client_state_[client_fd] = ClientState();// init outbox
+		client_state_[client_fd].close_after_write = false;
 		last_activity[client_fd] = time(NULL);
 	}
 }
@@ -159,25 +160,26 @@ void Server::run()
 		for (size_t i = 0; i < pfds.size(); i++)
 		{
 			 // Handle error-y revents (prevents “mystery hangs”)
-			if (pfds[i].revents & (POLLERR | POLLNVAL)) {     // [ADD]
-				int fd = pfds[i].fd;                          // [ADD]
-				close(fd);                                    // [ADD]
-				client_state_.erase(fd);                      // [ADD]
-				request_map.erase(fd);                        // [ADD]
+			if (pfds[i].revents & (POLLERR | POLLNVAL))
+			{
+				int fd = pfds[i].fd;
+				close(fd);
+				client_state_.erase(fd);
+				request_map.erase(fd);
 				last_activity.erase(fd);
-				pfds.erase(pfds.begin() + i);                 // [ADD]
-				--i;                                          // [ADD]
-				continue;                                     // [ADD]
-			}                                                 // [ADD]
+				pfds.erase(pfds.begin() + i);
+				--i;
+				continue;
+			}
 
-			// [ADD] Handle exactly one write OR one read per client per poll tick
+			// Handle exactly one write OR one read per client per poll tick
 			if (pfds[i].revents & POLLOUT)
 			{
 				int fd = pfds[i].fd;
 				std::map<int, ClientState>::iterator csit = client_state_.find(fd);
 				if (csit == client_state_.end() || csit->second.outbox.empty())
 				{
-					disableWrite(fd); // nothing to write; stop POLLOUT  // [ADD]
+					disableWrite(fd); // nothing to write; stop POLLOUT
 				}
 				else
 				{
@@ -185,40 +187,40 @@ void Server::run()
 					ssize_t n = send(fd, buf.data(), buf.size(), 0);
 					if (n > 0)
 					{
-						// remove the bytes we wrote (single write per poll)       // [ADD]
+						// remove the bytes we wrote (single write per poll)
 						csit->second.outbox.erase(0, static_cast<size_t>(n));
 						if (csit->second.outbox.empty())
 						{
 							if (csit->second.close_after_write)
 							{
-								// graceful close after fully flushed               // [ADD]
-								close(fd);                                         // [ADD]
-								client_state_.erase(fd);                           // [ADD]
-								request_map.erase(fd);                             // [ADD]
+								// graceful close after fully flushed
+								close(fd);
+								client_state_.erase(fd);
+								request_map.erase(fd);
 								last_activity.erase(fd);
-								pfds.erase(pfds.begin() + i);                      // [ADD]
-								--i;                                               // [ADD]
-								// do not touch pfds[i].revents after erase        // [ADD]
-								continue;                                          // [ADD]
+								pfds.erase(pfds.begin() + i);
+								--i;
+								// do not touch pfds[i].revents after erase
+								continue;
 							}
 							disableWrite(fd); // switch back to read-only
 						}
 					}
 					else
 					{
-						// DO NOT inspect errno; generic log and close.            // [ADD]
-						std::cerr << "send failed on fd " << fd << "\n";          // [ADD]
-						close(fd);                                                 // [ADD]
-						client_state_.erase(fd);                                   // [ADD]
-						request_map.erase(fd);                                     // [ADD]
+						// DO NOT inspect errno; generic log and close.
+						std::cerr << "send failed on fd " << fd << "\n";
+						close(fd);
+						client_state_.erase(fd);
+						request_map.erase(fd);
 						last_activity.erase(fd);
-						pfds.erase(pfds.begin() + i);                              // [ADD]
-						--i;                                                       // [ADD]
+						pfds.erase(pfds.begin() + i);
+						--i;
 					}
 				}
 				pfds[i].revents = 0;
 				last_activity[fd] = time(NULL);
-				continue; // one write OR one read per poll tick                   // [ADD]
+				continue; // one write OR one read per poll tick
 			}
 
 			// check if someone ready to read (or closed)
