@@ -1,4 +1,6 @@
 #include "cgi.hpp"
+#include <cerrno>
+#include <signal.h>
 
 std::string intToString(int value) {
     std::ostringstream oss;
@@ -350,6 +352,28 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
         return result;
     }
     
+    // Check if the script file actually exists and is executable
+    std::string full_script_path = working_directory + "/" + normalized_script_path;
+    if (access(full_script_path.c_str(), F_OK) != 0) {
+        result.success = false;
+        result.status_code = 404;
+        result.status_message = getStatusMessage(404);
+        result.headers = "Content-Type: text/html";
+        result.body = "<html><body><h1>404 Not Found</h1><p>CGI script file does not exist.</p></body></html>";
+        result.content = result.headers + "\r\n\r\n" + result.body;
+        return result;
+    }
+    
+    if (access(full_script_path.c_str(), X_OK) != 0) {
+        result.success = false;
+        result.status_code = 403;
+        result.status_message = getStatusMessage(403);
+        result.headers = "Content-Type: text/html";
+        result.body = "<html><body><h1>403 Forbidden</h1><p>CGI script is not executable.</p></body></html>";
+        result.content = result.headers + "\r\n\r\n" + result.body;
+        return result;
+    }
+    
     // Find the appropriate executor
     std::string extension = getFileExtension(normalized_script_path);
     std::string executor = findCGIExecutor(extension, cgi_extensions);
@@ -488,32 +512,92 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
         }
         close(input_pipe[1]);  // Close input to signal EOF
         
-        // Read response from CGI script
+        // Read response from CGI script with timeout
         std::string output;
         char buffer[4096];
         ssize_t bytes_read;
+        int timeout_count = 0;
+        const int max_timeout = 100; // 10 seconds (100 * 100ms)
         
-        while ((bytes_read = read(output_pipe[0], buffer, sizeof(buffer))) > 0) {
-            output.append(buffer, bytes_read);
+        std::cout << "[DEBUG] CGI starting to read output with timeout" << std::endl;
+        
+        while (timeout_count < max_timeout) {
+            // Use select to check if data is available with timeout
+            fd_set readfds;
+            struct timeval timeout;
+            
+            FD_ZERO(&readfds);
+            FD_SET(output_pipe[0], &readfds);
+            timeout.tv_sec = 0;
+            timeout.tv_usec = 100000; // 100ms
+            
+            int select_result = select(output_pipe[0] + 1, &readfds, NULL, NULL, &timeout);
+            
+            if (select_result > 0 && FD_ISSET(output_pipe[0], &readfds)) {
+                // Data is available, read it
+                bytes_read = read(output_pipe[0], buffer, sizeof(buffer));
+                if (bytes_read > 0) {
+                    output.append(buffer, bytes_read);
+                    timeout_count = 0; // Reset timeout counter when we get data
+                } else if (bytes_read == 0) {
+                    // EOF reached
+                    break;
+                }
+            } else if (select_result == 0) {
+                // Timeout - no data available
+                timeout_count++;
+                if (timeout_count % 10 == 0) {
+                    std::cout << "[DEBUG] CGI pipe read timeout... " << (timeout_count / 10) << " seconds elapsed" << std::endl;
+                }
+            } else {
+                // Error in select
+                break;
+            }
         }
+        
         close(output_pipe[0]);
+        
+        if (timeout_count >= max_timeout) {
+            std::cout << "[DEBUG] CGI pipe read timeout after 10 seconds" << std::endl;
+        }
 
         std::cout << "output =" << output << std::endl;
         
-        // Wait for child process to complete
-        int status;
-        waitpid(pid, &status, 0);
+        // Wait for child process to complete with timeout
+        int status = 0;
+        if (!waitForChildWithTimeout(pid, 10, status)) { // 10 second timeout to match test expectations
+            result.success = false;
+            result.status_code = 504; // Gateway Timeout
+            result.status_message = "Gateway Timeout";
+            result.headers = "Content-Type: text/html";
+            result.body = "<html><body><h1>504 Gateway Timeout</h1><p>CGI script execution timed out.</p></body></html>";
+            result.content = result.headers + "\r\n\r\n" + result.body;
+            freeEnvArray(env);
+            return result;
+        }
         
         // Clean up
         freeEnvArray(env);
         
         // Check if CGI script executed successfully
-        if (WEXITSTATUS(status) != 0) {
+        if (WIFEXITED(status)) {
+            int exit_status = WEXITSTATUS(status);
+            if (exit_status != 0) {
+                result.success = false;
+                result.status_code = 500;
+                result.status_message = getStatusMessage(500);
+                result.headers = "Content-Type: text/html";
+                result.body = "<html><body><h1>500 Internal Server Error</h1><p>CGI script execution failed with exit code " + intToString(exit_status) + ".</p></body></html>";
+                result.content = result.headers + "\r\n\r\n" + result.body;
+                return result;
+            }
+        } else if (WIFSIGNALED(status)) {
+            int signal_num = WTERMSIG(status);
             result.success = false;
             result.status_code = 500;
             result.status_message = getStatusMessage(500);
             result.headers = "Content-Type: text/html";
-            result.body = "<html><body><h1>500 Internal Server Error</h1><p>CGI script execution failed.</p></body></html>";
+            result.body = "<html><body><h1>500 Internal Server Error</h1><p>CGI script was terminated by signal " + intToString(signal_num) + ".</p></body></html>";
             result.content = result.headers + "\r\n\r\n" + result.body;
             return result;
         }
@@ -523,4 +607,47 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
 
         return result;
     }
+}
+
+bool CGIHandler::waitForChildWithTimeout(pid_t pid, int timeout_seconds, int& status) {
+    pid_t result;
+    int timeout_count = 0;
+    const int max_checks = timeout_seconds * 10; // Check every 100ms
+    
+    std::cout << "[DEBUG] CGI waiting for child process " << pid << " with timeout " << timeout_seconds << " seconds" << std::endl;
+    
+    // Use a polling approach with precise timing
+    while (timeout_count < max_checks) {
+        result = waitpid(pid, &status, WNOHANG);
+        
+        if (result == pid) {
+            // Child process has exited
+            std::cout << "[DEBUG] CGI child process " << pid << " exited with status: " << status << std::endl;
+            return true;
+        } else if (result == -1) {
+            std::cout << "[DEBUG] CGI waitpid failed with errno: " << errno << std::endl;
+            return false;
+        }
+        
+        // Child is still running, wait 100ms and check again
+        usleep(100000); // 100ms
+        timeout_count++;
+        
+        // Print progress every second
+        if (timeout_count % 10 == 0) {
+            std::cout << "[DEBUG] CGI still waiting... " << (timeout_count / 10) << " seconds elapsed" << std::endl;
+        }
+    }
+    
+    // Timeout occurred, kill the child process
+    std::cout << "[DEBUG] CGI timeout after " << timeout_seconds << " seconds - killing child process " << pid << std::endl;
+    kill(pid, SIGKILL);
+    
+    // Wait for the process to actually die
+    int kill_status;
+    waitpid(pid, &kill_status, 0);
+    status = kill_status;
+    
+    std::cout << "[DEBUG] CGI child process " << pid << " killed with status: " << status << std::endl;
+    return false; // Timeout
 }

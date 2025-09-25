@@ -1,0 +1,458 @@
+Reading config file: testconfig/test.conf
+Warning: Duplicate listen address 127.0.0.1:8083
+Successfully parsed 5 server(s)
+
+=== Configuration Summary ===
+
+Server 1:
+  Listen: 127.0.0.1:8080
+  Server Names: localhost example.com
+  Root: ./pages/www
+  Max Body Size: 10485760 bytes
+  Error Pages:
+    400 -> /error/400.html
+    404 -> /error/404.html
+    405 -> /error/408.html
+    413 -> /error/413.html
+    500 -> /error/500.html
+  Locations:
+    Path: /
+    Root: 
+    Index: index.html
+    Upload Path: 
+    Autoindex: off
+    Methods: GET
+    Path: /upload/
+    Root: ./pages
+    Index: 
+    Upload Path: ./pages/upload
+    Autoindex: on
+    Methods: GET POST DELETE
+    Path: /images/
+    Root: ./pages/www
+    Index: 
+    Upload Path: 
+    Autoindex: off
+    Methods: GET
+
+Server 2:
+  Listen: 127.0.0.1:8081
+  Server Names: cgi.localhost
+  Root: ./pages/www
+  Max Body Size: 5242880 bytes
+  Error Pages:
+    400 -> /error/400.html
+    404 -> /error/404.html
+    405 -> /error/408.html
+    413 -> /error/413.html
+    500 -> /error/500.html
+  Locations:
+    Path: /
+    Root: 
+    Index: index.html
+    Upload Path: 
+    Autoindex: off
+    Methods: GET POST
+    Path: /cgi_bin/
+    Root: ./cgi_bin
+    Index: 
+    Upload Path: 
+    Autoindex: on
+    Methods: GET POST DELETE
+    CGI Extensions:
+      .py -> /usr/bin/python3
+    Path: /upload/
+    Root: ./pages
+    Index: 
+    Upload Path: ./pages/upload
+    Autoindex: on
+    Methods: GET POST DELETE
+
+Server 3:
+  Listen: 127.0.0.1:8082
+  Server Names: stress.localhost
+  Root: ./pages/www
+  Max Body Size: 1048576 bytes
+  Error Pages:
+    400 -> /error/400.html
+    404 -> /error/404.html
+    405 -> /error/408.html
+    413 -> /error/413.html
+    500 -> /error/500.html
+  Locations:
+    Path: /
+    Root: 
+    Index: index.html
+    Upload Path: 
+    Autoindex: off
+    Methods: GET POST
+    Path: /upload/
+    Root: ./pages
+    Index: 
+    Upload Path: ./pages/upload
+    Autoindex: on
+    Methods: GET POST
+    Path: /cgi_bin/
+    Root: ./cgi_bin
+    Index: 
+    Upload Path: 
+    Autoindex: off
+    Methods: GET POST
+    CGI Extensions:
+      .py -> /usr/bin/python3
+
+Server 4:
+  Listen: 127.0.0.1:8083
+  Server Names: redirect.localhost
+  Root: ./pages/www
+  Max Body Size: 0 bytes
+  Error Pages:
+  Locations:
+    Path: /moved
+    Root: 
+    Index: 
+    Upload Path: 
+    Autoindex: off
+    Redirect: 301 -> /
+    Methods: GET
+    Path: /found
+    Root: 
+    Index: 
+    Upload Path: 
+    Autoindex: off
+    Redirect: 302 -> /images/test.jpg
+    Methods: GET
+    Path: /see-other
+    Root: 
+    Index: 
+    Upload Path: 
+    Autoindex: off
+    Redirect: 303 -> /
+    Methods: GET POST
+    Path: /temp
+    Root: 
+    Index: 
+    Upload Path: 
+    Autoindex: off
+    Redirect: 307 -> /upload/
+    Methods: GET POST
+    Path: /perm
+    Root: 
+    Index: 
+    Upload Path: 
+    Autoindex: off
+    Redirect: 308 -> /
+    Methods: GET POST
+
+Server 5:
+  Listen: 127.0.0.1:8083
+  Server Names: redirect.localhost
+  Root: ./pages/www
+  Max Body Size: 0 bytes
+  Error Pages:
+  Locations:
+    Path: /moved
+    Root: 
+    Index: 
+    Upload Path: 
+    Autoindex: off
+    Redirect: 301 -> /
+    Methods: GET
+    Path: /found
+    Root: 
+    Index: 
+    Upload Path: 
+    Autoindex: off
+    Redirect: 302 -> /images/test.jpg
+    Methods: GET
+    Path: /see-other
+    Root: 
+    Index: 
+    Upload Path: 
+    Autoindex: off
+    Redirect: 303 -> /
+    Methods: GET POST
+    Path: /temp
+    Root: 
+    Index: 
+    Upload Path: 
+    Autoindex: off
+    Redirect: 307 -> /upload/
+    Methods: GET POST
+    Path: /perm
+    Root: 
+    Index: 
+    Upload Path: 
+    Autoindex: off
+    Redirect: 308 -> /
+    Methods: GET POST
+
+=== Configuration Valid ===
+
+Starting web server with configuration...
+Port: 8080
+Document root: ./pages/www
+Web server started successfully!
+Visit http://localhost:8080 to see your website!
+Press Ctrl+C to stop the server
+waiting for connections
+There is no content-length in the header!
+Request From Socket 8 had successfully converted into object!
+[32m
+--- Request Line ---
+[0mMethod: GET
+Path: /cgi_bin/infinite_loop.py
+Version: HTTP/1.1
+[32m
+--- Headers ---
+[0maccept: */*
+host: 127.0.0.1:8081
+user-agent: curl/8.5.0
+[32m
+--- Body ---
+[0m
+CGI Status - Path: /cgi_bin/infinite_loop.py | CGI Enabled: YES
+Executing CGI Script: ./cgi_bin/infinite_loop.py
+[DEBUG] CGI executeCGI - Original script_path: ./cgi_bin/infinite_loop.py
+[DEBUG] CGI executeCGI - Working directory: ./
+[DEBUG] CGI executeCGI - Normalized script_path: ./cgi_bin/infinite_loop.py
+[DEBUG] CGI executeCGI - Extension: .py
+[DEBUG] CGI executeCGI - Executor: /usr/bin/python3
+[DEBUG] CGI setupStandardCGIVars - All headers:
+[DEBUG] Header: 'accept' = '*/*'
+[DEBUG] Header: 'host' = '127.0.0.1:8081'
+[DEBUG] Header: 'user-agent' = 'curl/8.5.0'
+[DEBUG] CGI setupStandardCGIVars - No CONTENT_TYPE header found for GET request
+[DEBUG] CGI executeCGI - Final script path for execution: cgi_bin/infinite_loop.py
+output =Content-Type: text/html
+
+<html><head><title>Infinite Loop Test</title></head>
+<body><h1>This script should timeout!</h1>
+<p>Starting infinite loop...</p>
+<p>Loop iteration: 1</p>
+<p>Loop iteration: 2</p>
+<p>Loop iteration: 3</p>
+<p>Loop iteration: 4</p>
+<p>Loop iteration: 5</p>
+<p>Loop iteration: 6</p>
+<p>Loop iteration: 7</p>
+<p>Loop iteration: 8</p>
+<p>Loop iteration: 9</p>
+<p>Loop iteration: 10</p>
+<p>Loop iteration: 11</p>
+<p>Loop iteration: 12</p>
+<p>Loop iteration: 13</p>
+<p>Loop iteration: 14</p>
+<p>Loop iteration: 15</p>
+<p>Loop iteration: 16</p>
+<p>Loop iteration: 17</p>
+<p>Loop iteration: 18</p>
+<p>Loop iteration: 19</p>
+<p>Loop iteration: 20</p>
+<p>Loop iteration: 21</p>
+<p>Loop iteration: 22</p>
+<p>Loop iteration: 23</p>
+<p>Loop iteration: 24</p>
+<p>Loop iteration: 25</p>
+<p>Loop iteration: 26</p>
+<p>Loop iteration: 27</p>
+<p>Loop iteration: 28</p>
+<p>Loop iteration: 29</p>
+<p>Loop iteration: 30</p>
+<p>Loop iteration: 31</p>
+<p>Loop iteration: 32</p>
+<p>Loop iteration: 33</p>
+<p>Loop iteration: 34</p>
+<p>Loop iteration: 35</p>
+<p>Loop iteration: 36</p>
+<p>Loop iteration: 37</p>
+<p>Loop iteration: 38</p>
+<p>Loop iteration: 39</p>
+<p>Loop iteration: 40</p>
+<p>Loop iteration: 41</p>
+<p>Loop iteration: 42</p>
+<p>Loop iteration: 43</p>
+<p>Loop iteration: 44</p>
+<p>Loop iteration: 45</p>
+<p>Loop iteration: 46</p>
+<p>Loop iteration: 47</p>
+<p>Loop iteration: 48</p>
+<p>Loop iteration: 49</p>
+<p>Loop iteration: 50</p>
+<p>Loop iteration: 51</p>
+<p>Loop iteration: 52</p>
+<p>Loop iteration: 53</p>
+<p>Loop iteration: 54</p>
+<p>Loop iteration: 55</p>
+<p>Loop iteration: 56</p>
+<p>Loop iteration: 57</p>
+<p>Loop iteration: 58</p>
+<p>Loop iteration: 59</p>
+<p>Loop iteration: 60</p>
+<p>Loop iteration: 61</p>
+<p>Loop iteration: 62</p>
+<p>Loop iteration: 63</p>
+<p>Loop iteration: 64</p>
+<p>Loop iteration: 65</p>
+<p>Loop iteration: 66</p>
+<p>Loop iteration: 67</p>
+<p>Loop iteration: 68</p>
+<p>Loop iteration: 69</p>
+<p>Loop iteration: 70</p>
+<p>Loop iteration: 71</p>
+<p>Loop iteration: 72</p>
+<p>Loop iteration: 73</p>
+<p>Loop iteration: 74</p>
+<p>Loop iteration: 75</p>
+<p>Loop iteration: 76</p>
+<p>Loop iteration: 77</p>
+<p>Loop iteration: 78</p>
+<p>Loop iteration: 79</p>
+<p>Loop iteration: 80</p>
+<p>Loop iteration: 81</p>
+<p>Loop iteration: 82</p>
+<p>Loop iteration: 83</p>
+<p>Loop iteration: 84</p>
+<p>Loop iteration: 85</p>
+<p>Loop iteration: 86</p>
+<p>Loop iteration: 87</p>
+<p>Loop iteration: 88</p>
+<p>Loop iteration: 89</p>
+<p>Loop iteration: 90</p>
+<p>Loop iteration: 91</p>
+<p>Loop iteration: 92</p>
+<p>Loop iteration: 93</p>
+<p>Loop iteration: 94</p>
+<p>Loop iteration: 95</p>
+<p>Loop iteration: 96</p>
+<p>Loop iteration: 97</p>
+<p>Loop iteration: 98</p>
+<p>Loop iteration: 99</p>
+<p>Loop iteration: 100</p>
+<p>Loop iteration: 101</p>
+<p>Safety break - timeout didn't work!</p>
+</body></html>
+
+[DEBUG] CGI waiting for child process 12495 with timeout 10 seconds
+[DEBUG] CGI child process 12495 exited with status: 0
+[DEBUG] CGI parseOutput - Raw output length: 2833
+[DEBUG] CGI parseOutput - Header end position: 23
+[DEBUG] CGI parseOutput - Separator length: 4
+[DEBUG] CGI parseOutput - Parsed headers: 'Content-Type: text/html'
+[DEBUG] CGI parseOutput - Body length: 2806
+[DEBUG] CGI executeCGI - Socket FD: 8
+[DEBUG] CGI parseOutput - Status code: 200
+[DEBUG] CGI parseOutput - Status message: OK
+[DEBUG] CGI parseOutput - Content length: 2833
+[DEBUG] CGI parseOutput - Content : Content-Type: text/html
+
+<html><head><title>Infinite Loop Test</title></head>
+<body><h1>This script should timeout!</h1>
+<p>Starting infinite loop...</p>
+<p>Loop iteration: 1</p>
+<p>Loop iteration: 2</p>
+<p>Loop iteration: 3</p>
+<p>Loop iteration: 4</p>
+<p>Loop iteration: 5</p>
+<p>Loop iteration: 6</p>
+<p>Loop iteration: 7</p>
+<p>Loop iteration: 8</p>
+<p>Loop iteration: 9</p>
+<p>Loop iteration: 10</p>
+<p>Loop iteration: 11</p>
+<p>Loop iteration: 12</p>
+<p>Loop iteration: 13</p>
+<p>Loop iteration: 14</p>
+<p>Loop iteration: 15</p>
+<p>Loop iteration: 16</p>
+<p>Loop iteration: 17</p>
+<p>Loop iteration: 18</p>
+<p>Loop iteration: 19</p>
+<p>Loop iteration: 20</p>
+<p>Loop iteration: 21</p>
+<p>Loop iteration: 22</p>
+<p>Loop iteration: 23</p>
+<p>Loop iteration: 24</p>
+<p>Loop iteration: 25</p>
+<p>Loop iteration: 26</p>
+<p>Loop iteration: 27</p>
+<p>Loop iteration: 28</p>
+<p>Loop iteration: 29</p>
+<p>Loop iteration: 30</p>
+<p>Loop iteration: 31</p>
+<p>Loop iteration: 32</p>
+<p>Loop iteration: 33</p>
+<p>Loop iteration: 34</p>
+<p>Loop iteration: 35</p>
+<p>Loop iteration: 36</p>
+<p>Loop iteration: 37</p>
+<p>Loop iteration: 38</p>
+<p>Loop iteration: 39</p>
+<p>Loop iteration: 40</p>
+<p>Loop iteration: 41</p>
+<p>Loop iteration: 42</p>
+<p>Loop iteration: 43</p>
+<p>Loop iteration: 44</p>
+<p>Loop iteration: 45</p>
+<p>Loop iteration: 46</p>
+<p>Loop iteration: 47</p>
+<p>Loop iteration: 48</p>
+<p>Loop iteration: 49</p>
+<p>Loop iteration: 50</p>
+<p>Loop iteration: 51</p>
+<p>Loop iteration: 52</p>
+<p>Loop iteration: 53</p>
+<p>Loop iteration: 54</p>
+<p>Loop iteration: 55</p>
+<p>Loop iteration: 56</p>
+<p>Loop iteration: 57</p>
+<p>Loop iteration: 58</p>
+<p>Loop iteration: 59</p>
+<p>Loop iteration: 60</p>
+<p>Loop iteration: 61</p>
+<p>Loop iteration: 62</p>
+<p>Loop iteration: 63</p>
+<p>Loop iteration: 64</p>
+<p>Loop iteration: 65</p>
+<p>Loop iteration: 66</p>
+<p>Loop iteration: 67</p>
+<p>Loop iteration: 68</p>
+<p>Loop iteration: 69</p>
+<p>Loop iteration: 70</p>
+<p>Loop iteration: 71</p>
+<p>Loop iteration: 72</p>
+<p>Loop iteration: 73</p>
+<p>Loop iteration: 74</p>
+<p>Loop iteration: 75</p>
+<p>Loop iteration: 76</p>
+<p>Loop iteration: 77</p>
+<p>Loop iteration: 78</p>
+<p>Loop iteration: 79</p>
+<p>Loop iteration: 80</p>
+<p>Loop iteration: 81</p>
+<p>Loop iteration: 82</p>
+<p>Loop iteration: 83</p>
+<p>Loop iteration: 84</p>
+<p>Loop iteration: 85</p>
+<p>Loop iteration: 86</p>
+<p>Loop iteration: 87</p>
+<p>Loop iteration: 88</p>
+<p>Loop iteration: 89</p>
+<p>Loop iteration: 90</p>
+<p>Loop iteration: 91</p>
+<p>Loop iteration: 92</p>
+<p>Loop iteration: 93</p>
+<p>Loop iteration: 94</p>
+<p>Loop iteration: 95</p>
+<p>Loop iteration: 96</p>
+<p>Loop iteration: 97</p>
+<p>Loop iteration: 98</p>
+<p>Loop iteration: 99</p>
+<p>Loop iteration: 100</p>
+<p>Loop iteration: 101</p>
+<p>Safety break - timeout didn't work!</p>
+</body></html>
+
+Queue CGI Response
+Timeout closing fd 8 (idle for 104s)
+Sent 408 timeout response to fd 8

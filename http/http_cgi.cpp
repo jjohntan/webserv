@@ -35,7 +35,7 @@ static void stripCgiStatusHeader(std::string& headersAndBody)
 	headersAndBody = newHdr.str() + "\r\n" + body;
 }
 
-// Use existing ErrorResponse class instead of custom static functions
+
 static void sendError(int code, const std::string& message, int socketFD, const ServerConfig* sc, const HTTPRequest* req, Server& srv)
 {
 	if (!sc) {
@@ -217,7 +217,7 @@ std::string parseMultipartData(const std::string& body, const std::string& bound
 	return content;
 }
 
-// Helper function to handle file uploads (POST)
+// Helper function to handle file uploads 
 bool handleFileUpload(const HTTPRequest& request, const std::string& upload_path, int socketFD, const ServerConfig* server_config, Server& srv) {
 	std::string body = request.getRawBody();
 	if (body.empty()) {
@@ -295,7 +295,7 @@ bool handleFileUpload(const HTTPRequest& request, const std::string& upload_path
 	return true;
 }
 
-// Helper function to handle file deletion (DELETE)
+// Helper function to handle file deletion 
 bool handleFileDeletion(const HTTPRequest& request, const std::string& server_root, int socketFD, const ServerConfig* server_config, Server& srv) {
 	std::string path = request.getPath();
 	
@@ -359,19 +359,19 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 			stripCgiStatusHeader(cgiPayload);
 			HTTPResponse response(cgi_result.status_message, cgi_result.status_code, cgiPayload, socketFD);
 			std::cout << "Queue CGI Response\n";
-			srv.queueResponse(socketFD, response.getRawResponse()); // [CHANGE]
+			srv.queueResponse(socketFD, response.getRawResponse()); 
 			return;
 		}
 		
 	}
 
 
-	std::string server_root = server_config ? server_config->root : "pages/www";  // [CHANGE]
+	std::string server_root = server_config ? server_config->root : "pages/www";  
 	if (matching_location && !matching_location->root.empty())
 		server_root = matching_location->root;
 
 	// Per-location index for "/" paths
-	std::string filePath;                                                         // [CHANGE]
+	std::string filePath;                                                         
 	if (path == "/" || path.empty()) {
 		std::string indexName = (matching_location && !matching_location->index.empty())
 								? matching_location->index : "index.html";

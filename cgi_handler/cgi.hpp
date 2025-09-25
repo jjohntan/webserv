@@ -49,6 +49,7 @@ private:
     std::string normalizePath(const std::string& path);
     int extractStatusFromHeaders(const std::string& headers);
     std::string getStatusMessage(int status_code);
+    bool waitForChildWithTimeout(pid_t pid, int timeout_seconds, int& status);
     
 public:
     CGIHandler();

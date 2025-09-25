@@ -192,15 +192,30 @@
             xhr.open(method, url, true);
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
-                    document.getElementById('message').innerHTML = 
-                        method + ' request to ' + url + ' returned status: ' + xhr.status;
+                    var statusText = xhr.status + ' ' + (xhr.statusText || '');
+                    var responseText = xhr.responseText ? xhr.responseText.substring(0, 100) + '...' : '';
+                    document.getElementById('http-message').innerHTML = 
+                        '<strong>' + method + '</strong> request to <code>' + url + '</code><br>' +
+                        'Status: <span style="color: ' + (xhr.status >= 200 && xhr.status < 300 ? 'green' : 'red') + '">' + statusText + '</span><br>' +
+                        (responseText ? 'Response: ' + responseText : '');
                 }
             };
+            xhr.onerror = function() {
+                document.getElementById('http-message').innerHTML = 
+                    '<strong>' + method + '</strong> request to <code>' + url + '</code><br>' +
+                    '<span style="color: red;">Error: Connection failed</span>';
+            };
             try {
-                xhr.send();
+                if (method === 'POST') {
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    xhr.send('test=data&message=Hello from POST test');
+                } else {
+                    xhr.send();
+                }
             } catch(e) {
-                document.getElementById('message').innerHTML = 
-                    'Error testing ' + method + ': ' + e.message;
+                document.getElementById('http-message').innerHTML = 
+                    '<strong>' + method + '</strong> request to <code>' + url + '</code><br>' +
+                    '<span style="color: red;">Error: ' + e.message + '</span>';
             }
         }
 
@@ -230,6 +245,112 @@
             xhr.send();
         }
 
+        function uploadFile(event) {
+            event.preventDefault();
+            var fileInput = document.getElementById('fileInput');
+            var file = fileInput.files[0];
+            
+            if (!file) {
+                document.getElementById('upload-message').innerHTML = '<span style="color: red;">Please select a file to upload</span>';
+                return;
+            }
+            
+            var formData = new FormData();
+            formData.append('file', file);
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/upload/', true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    var statusText = xhr.status + ' ' + (xhr.statusText || '');
+                    var responseText = xhr.responseText ? xhr.responseText.substring(0, 200) + '...' : '';
+                    document.getElementById('upload-message').innerHTML = 
+                        '<strong>File Upload Result:</strong><br>' +
+                        'File: <code>' + file.name + '</code><br>' +
+                        'Status: <span style="color: ' + (xhr.status >= 200 && xhr.status < 300 ? 'green' : 'red') + '">' + statusText + '</span><br>' +
+                        (responseText ? 'Response: ' + responseText : '');
+                }
+            };
+            xhr.onerror = function() {
+                document.getElementById('upload-message').innerHTML = 
+                    '<span style="color: red;">Upload failed - connection error</span>';
+            };
+            xhr.send(formData);
+        }
+
+        function testDeleteFile() {
+            var filename = document.getElementById('deleteFileInput').value.trim();
+            
+            if (!filename) {
+                document.getElementById('http-message').innerHTML = '<span style="color: red;">Please enter a filename to delete</span>';
+                return;
+            }
+            
+            // Remove any leading slashes and ensure it's in the upload directory
+            filename = filename.replace(/^\/+/, '');
+            if (!filename.startsWith('upload/')) {
+                filename = 'upload/' + filename;
+            }
+            
+            testHttpMethod('DELETE', '/' + filename);
+        }
+
+        function listUploadFiles() {
+            document.getElementById('http-message').innerHTML = 'Loading files from upload directory...';
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/upload/', true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        // Parse the directory listing HTML to extract filenames
+                        var parser = new DOMParser();
+                        var doc = parser.parseFromString(xhr.responseText, 'text/html');
+                        var links = doc.querySelectorAll('a[href]');
+                        var files = [];
+                        
+                        for (var i = 0; i < links.length; i++) {
+                            var href = links[i].getAttribute('href');
+                            if (href && !href.endsWith('/') && href !== '../') {
+                                files.push(href);
+                            }
+                        }
+                        
+                        if (files.length > 0) {
+                            var fileList = files.map(function(file) {
+                                return '<span style="cursor: pointer; color: #3498db; text-decoration: underline;" onclick="selectFileForDelete(\'' + file + '\')">' + file + '</span>';
+                            }).join(', ');
+                            
+                            document.getElementById('http-message').innerHTML = 
+                                '<strong>Available files in /upload/:</strong><br>' +
+                                fileList + '<br><br>' +
+                                '<small>Click on a filename to select it for deletion</small>';
+                        } else {
+                            document.getElementById('http-message').innerHTML = 
+                                '<strong>Upload directory is empty</strong><br>' +
+                                'Upload some files first to test DELETE functionality';
+                        }
+                    } else {
+                        document.getElementById('http-message').innerHTML = 
+                            '<span style="color: red;">Failed to list files. Status: ' + xhr.status + '</span><br>' +
+                            'Make sure the server supports directory listing for /upload/';
+                    }
+                }
+            };
+            xhr.onerror = function() {
+                document.getElementById('http-message').innerHTML = 
+                    '<span style="color: red;">Failed to connect to server</span>';
+            };
+            xhr.send();
+        }
+
+        function selectFileForDelete(filename) {
+            document.getElementById('deleteFileInput').value = filename;
+            document.getElementById('http-message').innerHTML = 
+                '<span style="color: green;">Selected file: <strong>' + filename + '</strong></span><br>' +
+                'Click "Test DELETE" to delete this file';
+        }
+
         window.onload = function() {
             console.log('WebServ static page loaded successfully!');
             console.log('Testing JavaScript execution...');
@@ -253,6 +374,27 @@
         <input type="button" onclick="showServerInfo()" value="Server Info" />
         <input type="button" onclick="testStatic()" value="Test Static Files" />
         <p id="message"></p>
+    </div>
+
+    <div class="interactive-section">
+        <h2>HTTP Method Tests:</h2>
+        <input type="button" onclick="testHttpMethod('GET', '/')" value="Test GET" />
+        <input type="button" onclick="testHttpMethod('POST', '/upload/')" value="Test POST" />
+        <div style="margin: 10px 0;">
+            <input type="text" id="deleteFileInput" placeholder="Enter filename to delete (e.g., test.txt)" style="padding: 5px; margin-right: 5px; width: 250px;" />
+            <input type="button" onclick="testDeleteFile()" value="Test DELETE" />
+            <input type="button" onclick="listUploadFiles()" value="List Files" style="margin-left: 5px;" />
+        </div>
+        <p id="http-message"></p>
+    </div>
+
+    <div class="upload-form">
+        <h2>File Upload Test (POST):</h2>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <input type="file" id="fileInput" name="file" />
+            <input type="submit" value="Upload File" onclick="uploadFile(event)" />
+        </form>
+        <p id="upload-message"></p>
     </div>
     
 
