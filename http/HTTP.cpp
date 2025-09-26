@@ -9,20 +9,7 @@
 #include <sys/socket.h>  // recv
 #include <sstream>
 
-const ServerConfig* getActiveServer(const std::vector<ServerConfig>& serverConfig)
-{
-	if (serverConfig.empty())
-		return (NULL);
-	return (&serverConfig[0]);
-}
-
-const Location* getMatchingLocation(const std::string& path,
-									const std::vector<ServerConfig>& serverConfig)
-{
-	return (getMatchingLocation(path, getActiveServer(serverConfig)));
-}
-
-const	Location* getMatchingLocation(const std::string &path, const ServerConfig* servercConfig)
+const Location*	getMatchingLocation(const std::string &path, const ServerConfig* servercConfig)
 {
 	if (!servercConfig)
 		return (NULL);
@@ -90,7 +77,7 @@ bool	checkAllowedMethod(const HTTPRequest &request, int socketFD, const std::vec
 		std::string extra = "Allow: " + allow.str() + "\r\n";
 		extra += request.connectionHeader(request.isConnectionAlive());
 
-		ErrorResponse resp(405, "Method Not Allowed", *active, extra, socketFD);              // [CHANGE]
+		ErrorResponse resp(405, "Method Not Allowed", *active, extra, socketFD);
 		srv.queueResponse(socketFD, resp.getRawResponse()); 
 		return (true);
 	}
@@ -112,8 +99,8 @@ bool	checkPayLoad(const HTTPRequest &request, int socketFD, const std::vector<Se
 		{
 			// Provide Connection header matching keep-alive decision
 			std::string extra = request.connectionHeader(request.isConnectionAlive());
-			ErrorResponse resp(413, "Payload Too Large", *active, extra, socketFD);           // [CHANGE]
-			srv.queueResponse(socketFD, resp.getRawResponse());                               // [ADD]
+			ErrorResponse resp(413, "Payload Too Large", *active, extra, socketFD);
+			srv.queueResponse(socketFD, resp.getRawResponse());
 			return (true);
 		}
 	}
@@ -144,6 +131,22 @@ const char* reasonPhrase(int code)
 	Location
 		redirect_code (301, 302, 303, 307, 308)
 		redirect_url (where to send the client)
+
+	When include_body = true
+	Response :
+	HTTP/1.1 301 Moved Permanently
+	Location: /new
+	Content-Type: text/html
+	Connection: keep-alive
+
+	<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Moved Permanently</title></head><body><h1>Moved Permanently</h1><p><a href="/new">/new</a></p></body></html>
+
+	When include_body = false
+	HTTP/1.1 302 Found
+	Location: /
+	Content-Type: text/html
+	Connection: close
+
 */
 bool	checkRedirectResponse(const HTTPRequest &request, int socketFD, const std::vector<ServerConfig> &serverConfig, Server& srv) // [CHANGE]
 {
@@ -181,8 +184,31 @@ bool	checkRedirectResponse(const HTTPRequest &request, int socketFD, const std::
 		if (include_body)
 			out << body;
 
-		HTTPResponse resp(reason, code, out.str(), socketFD);                                          // [CHANGE]
+		HTTPResponse resp(reason, code, out.str(), socketFD);
 		srv.queueResponse(socketFD, resp.getRawResponse()); 
+		return (true);
+	}
+	return (false);
+}
+
+/*
+	Advance to next pipelined request (if any) by:
+	1) cutting off the bytes we just consumed
+	2) resetting parser state
+	3) re-feeding the leftover tail
+	Returns true if another buffered request is now ready to be processed.
+*/
+bool	advancePipeline(HTTPRequest& request)
+{
+	const size_t used = request.endOfMessageOffset();
+	const std::string tail = request.getRawString().substr(used);
+	request.resetForNextRequest();
+	if (!tail.empty())
+	{
+		// feed the remainder (may contain another full request)
+		// NOTE: feed takes std::string& in your class, so create a modifiable copy.
+		std::string copy = tail;
+		request.feed(copy);
 		return (true);
 	}
 	return (false);
@@ -221,9 +247,7 @@ void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::v
 		return ;
 	}
 	if (read_bytes > 0)
-	{
 		srv.last_activity[socketFD] = time(NULL);
-	}
 	std::string	data(buffer, read_bytes);
 	bool	isClearing = false;
 	isClearing = processClientData(socketFD, requestMap, data, servers, srv); // [CHANGE]
@@ -244,7 +268,6 @@ void	readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::v
 	HTTP/1.1 pipelining	
 	client sends multiple requests back-to-back on the same TCP connection without waiting for the previous response	
 */
-
 bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::string data, const std::vector<ServerConfig>& servers, Server& srv) // [CHANGE]
 {
 	try
@@ -264,36 +287,21 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 			{
 				bool closeIt = !req.isConnectionAlive();
 				if (closeIt)
-					srv.markCloseAfterWrite(socketFD);      // [ADD] close after queued bytes flush
+					srv.markCloseAfterWrite(socketFD);  // close after queued bytes flush
 
-				// keep remainder (if any), then reset and re-feed it
-				size_t used = req.endOfMessageOffset();
-				std::string tail = req.getRawString().substr(used); // get the content of next pipeline request
-				req.resetForNextRequest();
-				if (!tail.empty())
-				{
-					req.feed(tail);
+				if (advancePipeline(req))
 					continue; // loop for next buffered request
-				}
-				return (false); // do not force-close here
+				return (false); // no more pipelined data
 			}
-
 			// normal response path
 			handleRequestProcessing(req, socketFD, servers, srv); // [CHANGE] queues internally
 			bool closeIt = !req.isConnectionAlive();
-				if (closeIt)
-					srv.markCloseAfterWrite(socketFD);      // [ADD] close after queued bytes flush
+			if (closeIt)
+				srv.markCloseAfterWrite(socketFD);  // close after queued bytes flush
 
-			// keep remainder (if any), then reset and re-feed it
-			size_t used = req.endOfMessageOffset();
-			std::string tail = req.getRawString().substr(used);
-			req.resetForNextRequest();
-			if (!tail.empty())
-			{
-				req.feed(tail);
-				continue; // process next pipelined request
-			}
-			return (false);
+			if (advancePipeline(req))
+				continue; // loop for next buffered request
+			return (false); // no more pipelined data
 		}
 		return (false); // need more bytes for next request
 	}
@@ -308,10 +316,7 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 		// If we still have a request object for this fd, try to use its Host header
 		std::map<int, HTTPRequest>::const_iterator it = requestMap.find(socketFD);
 		if (it != requestMap.end())
-		{
-			// findServerConfig is declared in http_cgi.hpp (which you already include)
 			active = findServerConfig(it->second, servers);
-		}
 
 		// Fallback: if nothing resolved, use the first configured server
 		if (!active && !servers.empty())
@@ -321,7 +326,7 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 		{
 			ErrorResponse err(400, "Bad Request", *active, socketFD);
 			srv.queueResponse(socketFD, err.getRawResponse());
-			srv.markCloseAfterWrite(socketFD);   // [ADD] close after sending the error
+			srv.markCloseAfterWrite(socketFD);
 		}
 		else
 		{
@@ -336,7 +341,7 @@ bool	processClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std
 				<< body;
 			HTTPResponse err("Bad Request", 400, out.str(), socketFD);
 			srv.queueResponse(socketFD, err.getRawResponse());
-			srv.markCloseAfterWrite(socketFD);   // [ADD]
+			srv.markCloseAfterWrite(socketFD);
 		}
 
 		return (false); // let POLLOUT flush then close
