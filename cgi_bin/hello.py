@@ -133,9 +133,9 @@ print("Select file: <input type='file' name='file' required>")
 print("<input type='submit' value='Upload File'>")
 print("</form>")
 
-print("<h3>DELETE Test:</h3>")
-print("<p>Use curl to test DELETE:</p>")
-print("<pre>curl -X DELETE http://localhost:8081/cgi_bin/hello.py</pre>")
+# print("<h3>DELETE Test:</h3>")
+# print("<p>Use curl to test DELETE:</p>")
+# print("<pre>curl -X DELETE http://localhost:8081/cgi_bin/hello.py</pre>")
 
 print("<h2>Navigation:</h2>")
 print("<ul>")
