@@ -1,6 +1,9 @@
 CXX = c++
 CXXFLAGS = -std=c++98 -Wall -Wextra -Werror -g
 
+CGI_DIR = cgi_bin
+UPLOAD_DIR = ./pages/upload
+
 # Target executable
 WEBSERVER = webserver
 
@@ -41,12 +44,17 @@ HEADERS = Server.hpp \
 		  http/HTTPResponse/ErrorResponse.hpp \
 
 # Default target
-all: $(WEBSERVER)
+all: cgi-perms $(WEBSERVER)
 
 # Build the main executable
 $(WEBSERVER): $(OBJECTS)
 	$(CXX) $(CXXFLAGS) -o $(WEBSERVER) $(OBJECTS)
 	@echo "Web server build complete! Executable: $(WEBSERVER)"
+
+cgi-perms:
+	@echo "Ensuring CGI scripts are executable..."
+	@find $(CGI_DIR) -maxdepth 1 -type f -name '*.py' -exec chmod +x {} +
+	@echo "CGI script permissions updated"
 
 # Object file dependencies
 main.o: main.cpp Server.hpp config_files/config.hpp
@@ -94,10 +102,14 @@ re: fclean all
 	@echo "Re-compilation complete!"
 
 # Test CGI scripts
-test-cgi:
+test-cgi: cgi-perms
 	@echo "Testing CGI scripts..."
-	@chmod +x cgi_bin/python/*.py
 	@echo "CGI scripts are ready for testing"
+
+clean-uploads:
+	@echo "Cleaning uploaded files (except Capybara.jpg)..."
+	@find $(UPLOAD_DIR) -type f ! -name 'Capybara.jpg' -delete
+	@echo "Upload directory refreshed"
 
 # Run the server with default config
 run: $(WEBSERVER)
@@ -112,4 +124,4 @@ valgrind:
 debug: CXXFLAGS += -DDEBUG -g3
 debug: $(WEBSERVER)
 
-.PHONY: all clean fclean re test-cgi run debug
+.PHONY: all clean fclean re test-cgi run debug cgi-perms clean-uploads

@@ -7,6 +7,8 @@
 #include <sstream>  // For std::istringstream, std::ostringstream, std::stringstream
 #include <string>
 #include <stdexcept>
+#include <cctype>
+
 
 # define RED "\033[31m"
 # define GREEN "\033[32m"
@@ -55,6 +57,9 @@ class	HTTPRequest
 		std::string	_query;
 		std::string	_version;
 
+		bool	_useMultipartBoundary;   // true when we should use boundary-terminated framing
+		std::string _boundary;               // boundary token without the leading "--"
+
 		void	extractRequestLine();
 		void	processRequestLine(std::string &line);
 		void	trimBackslashR(std::string &line);
@@ -67,6 +72,8 @@ class	HTTPRequest
 		void	checkChunked();
 		void	processConnection();
 		bool	evaluateAlive(const std::string version, const bool hasConnection, const std::string connection);
+		bool	hasMultipart() const;
+		bool	extractBoundary(const std::string &ctype, std::string &outBoundary) const;
 
 		/* Body */
 		void	processChunked();
@@ -132,6 +139,7 @@ class	HTTPRequest
 
 		/* Utility */
 		std::string	connectionHeader(bool keep) const;
+
 };
 
 #endif

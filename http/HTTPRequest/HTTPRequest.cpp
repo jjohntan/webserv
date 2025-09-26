@@ -9,7 +9,8 @@ HTTPRequest::HTTPRequest():
 	_bodyPos(0),
 	_chunkSize(0),
 	_content_length(0),
-	_request_line_len(0)
+	_request_line_len(0),
+	_useMultipartBoundary(false)
 {}
 
 HTTPRequest::HTTPRequest(int socketFD):
@@ -22,7 +23,8 @@ HTTPRequest::HTTPRequest(int socketFD):
 	_bodyPos(0),
 	_chunkSize(0),
 	_content_length(0),
-	_request_line_len(0)
+	_request_line_len(0),
+	_useMultipartBoundary(false)
 {}
 
 HTTPRequest::HTTPRequest(const HTTPRequest &other):
@@ -33,7 +35,8 @@ HTTPRequest::HTTPRequest(const HTTPRequest &other):
 	_chunkedComplete(other._chunkedComplete), _bodyPos(other._bodyPos),
 	_chunkSize(other._chunkSize), _content_length(other._content_length),
 	_request_line(other._request_line), _request_line_len(other._request_line_len),
-	_method(other._method), _path(other._path), _version(other._version)
+	_method(other._method), _path(other._path), _version(other._version),
+	_useMultipartBoundary(other._useMultipartBoundary), _boundary(other._boundary)
 {}
 
 HTTPRequest &HTTPRequest::operator=(const HTTPRequest &other)
@@ -59,6 +62,8 @@ HTTPRequest &HTTPRequest::operator=(const HTTPRequest &other)
 		this->_method = other._method;
 		this->_path = other._path;
 		this->_version = other._version;
+		this->_useMultipartBoundary = other._useMultipartBoundary;
+		this->_boundary = other._boundary;
 	}
 	return (*this);
 }
@@ -231,11 +236,12 @@ void	HTTPRequest::extractRequestLine()
 {
 	if (this->_rawString.empty())
 		throw (HTTPRequest::EmptyRawString());
-	std::string	current_line;
-	std::istringstream stream(this->_rawString); // for getline()
-	
-	std::getline(stream, current_line);
-	this->_request_line_len = current_line.size(); // doesn't include '/n'
+	size_t crlf = this->_rawString.find("\r\n");
+	if (crlf == std::string::npos)
+		throw (HTTPRequest::EmptyRawString());
+	std::string current_line = this->_rawString.substr(0, crlf);
+	// Now _request_line_len includes the CRLF
+	this->_request_line_len = crlf + 2;
 	this->processRequestLine(current_line);
 }
 
@@ -265,7 +271,7 @@ void	HTTPRequest::processRequestLine(std::string &line)
 	// If it's "*", treat as root.
 	if (target == "*")
 	{
-		_path = "/*";
+		_path = "*";     // keep it "*"
 		_query.clear();
 		return;
 	}
@@ -342,29 +348,62 @@ void	HTTPRequest::extractHeader()
 
 		// Convert header key to lower case for case insensitive
 		for (size_t i = 0; i < key.length(); i++)
-			key[i] = std::tolower(key[i]);
-
+			key[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(key[i])));
 		this->_header[key] = value;
 	}
 }
 
-void	HTTPRequest::analyzeHeader()
+void HTTPRequest::analyzeHeader()
 {
 	this->checkChunked();
 	if (this->_isChunked == false)
 		this->checkContentLength();
 	this->processConnection();
+	// Multipart fallback: only when not chunked AND no Content-Length
+	if (_isChunked == false && _content_length == 0 && hasMultipart() == true)
+	{
+		std::map<std::string, std::string>::const_iterator it = _header.find("content-type");
+		if (it != _header.end())
+		{
+			std::string found;
+			bool ok = extractBoundary(it->second, found);
+			if (ok == true)
+			{
+				_boundary = found;
+				_useMultipartBoundary = true;
+			}
+		}
+	}
 }
 
-void	HTTPRequest::checkChunked()
+
+void HTTPRequest::checkChunked()
 {
 	std::map<std::string, std::string>::iterator it = _header.find("transfer-encoding");
 
-	if (it != _header.end()) // found
-		this->_isChunked = true;
+	if (it == _header.end())
+	{
+		_isChunked = false;
+		return;
+	}
+
+	std::string value = it->second;
+
+	for (size_t i = 0; i < value.size(); ++i)
+	{
+		value[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(value[i])));
+	}
+
+	if (value.find("chunked") != std::string::npos)
+	{
+		_isChunked = true;
+	}
 	else
-		this->_isChunked = false;
+	{
+		_isChunked = false;
+	}
 }
+
 
 void	HTTPRequest::checkContentLength()
 {
@@ -407,7 +446,7 @@ void	HTTPRequest::processConnection()
 	
 	// Make all words lowercase
 	for (size_t	i = 0; i < connection.size(); ++i)
-		connection[i] = std::tolower(connection[i]);
+		connection[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(connection[i])));
 	this->_connectionAlive = evaluateAlive(version, hasConnection, connection);
 }
 
@@ -438,6 +477,72 @@ bool	HTTPRequest::evaluateAlive(const std::string version, const bool hasConnect
 	return (false);
 }
 
+bool HTTPRequest::hasMultipart() const
+{
+    std::map<std::string, std::string>::const_iterator it = _header.find("content-type");
+
+    if (it == _header.end())
+    {
+        return (false);
+    }
+
+    std::string ctype = it->second;
+
+    for (size_t i = 0; i < ctype.size(); ++i)
+    {
+        ctype[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(ctype[i])));
+    }
+
+    if (ctype.find("multipart/form-data") != std::string::npos)
+    {
+        return (true);
+    }
+
+    return (false);
+}
+
+bool HTTPRequest::extractBoundary(const std::string &ctype, std::string &outBoundary) const
+{
+	// Work on a lower-cased copy to find "boundary="
+	std::string lowered = ctype;
+	for (size_t i = 0; i < lowered.size(); ++i)
+		lowered[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(lowered[i])));
+	size_t pos = lowered.find("boundary=");
+	if (pos == std::string::npos)
+		return (false);
+	// Now use the original string to extract the exact token
+	size_t start = pos + 9;
+	while (start < ctype.size() && (ctype[start] == ' ' || ctype[start] == '\t'))
+		++start;
+	if (start >= ctype.size())
+		return (false);
+	if (ctype[start] == '"')
+	{
+		size_t endQuote = ctype.find('"', start + 1);
+		if (endQuote == std::string::npos)
+			return (false);
+		if (endQuote <= start + 1)
+			return (false);
+		outBoundary = ctype.substr(start + 1, endQuote - (start + 1));
+		if (outBoundary.empty())
+			return (false);
+		return (true);
+	}
+	size_t end = start;
+	while (end < ctype.size()
+		&& ctype[end] != ';'
+		&& ctype[end] != ' '
+		&& ctype[end] != '\t'
+		&& ctype[end] != '\r'
+		&& ctype[end] != '\n')
+		++end;
+	outBoundary = ctype.substr(start, end - start);
+	if (outBoundary.empty())
+		return (false);
+	return (true);
+}
+
+
 /*********************BODY******************************* */
 /********************CHUNKED********************************* */
 void	HTTPRequest::processChunked()
@@ -462,7 +567,7 @@ void	HTTPRequest::skipHeader()
 {
 	size_t	header_end = this->_rawString.find("\r\n\r\n");
 	size_t	body_start = header_end + 4; // to skip "\r\n\r\n"
-		_bodyPos = body_start;
+	_bodyPos = body_start;
 }
 
 bool	HTTPRequest::readChunkSize()
@@ -520,17 +625,66 @@ bool	HTTPRequest::readChunkData()
 }
 
 /****************************UNCHUNKED*************************** */
-void	HTTPRequest::processUnchunked()
+void HTTPRequest::processUnchunked()
 {
-	size_t	header_end = this->_rawString.find("\r\n\r\n");
-	size_t	body_start = header_end + 4; // to skip "\r\n\r\n"
-	if (this->_rawString.size() >= body_start + this->_content_length) // to ensure full body is received
+	size_t header_end = this->_rawString.find("\r\n\r\n");
+	if (header_end == std::string::npos)
+		return;
+	size_t body_start = header_end + 4;
+	// Case 1: Content-Length framing
+	if (_content_length > 0)
 	{
-		std::string	text = this->_rawString.substr(body_start, this->_content_length);
-		this->_rawBody = text;
-		this->_body.insert(_body.end(), text.begin(), text.end());
-		this->_bodyComplete = true;
+		if (this->_rawString.size() >= body_start + _content_length)
+		{
+			std::string text = this->_rawString.substr(body_start, _content_length);
+
+			this->_rawBody = text;
+			this->_body.insert(_body.end(), text.begin(), text.end());
+			this->_bodyComplete = true;
+		}
+		return;
 	}
+
+	// Case 2: Multipart with boundary, no Content-Length (fallback)
+	if (_useMultipartBoundary == true && _boundary.empty() == false)
+	{
+		// Closing sequence is typically "\r\n--<boundary>--\r\n"
+		std::string closing = "\r\n--";
+		closing += _boundary;
+		closing += "--";
+
+		size_t pos = this->_rawString.find(closing, body_start);
+
+		if (pos != std::string::npos)
+		{
+			// Body ends right before the CRLF that precedes the closing marker.
+			std::string text = this->_rawString.substr(body_start, pos - body_start);
+
+			this->_rawBody = text;
+			this->_body.assign(text.begin(), text.end());
+			this->_bodyComplete = true;
+
+			// Compute end-of-message position:
+			// 1) move past "\r\n--<boundary>--"
+			size_t message_end = pos + closing.size();
+
+			// 2) some clients send a final "\r\n" after the closing boundary
+			if (this->_rawString.size() >= message_end + 2)
+			{
+				if (this->_rawString.substr(message_end, 2) == "\r\n")
+					message_end += 2;
+			}
+
+			// Store like chunked path does, so endOfMessageOffset() can use it
+			this->_bodyPos = message_end;
+		}
+
+		return;
+}
+
+	// No explicit framing → treat as empty body (e.g. GET requests)
+	this->_bodyComplete = true;
+	this->_bodyPos = body_start;
 }
 
 /******************EXCEPTION******************* */
@@ -592,18 +746,25 @@ void HTTPRequest::resetForNextRequest()
 	_path.clear();
 	_query.clear();
 	_version.clear();
+	_useMultipartBoundary = false;
+	_boundary.clear();
 }
 
 size_t HTTPRequest::endOfMessageOffset() const
 {
-	// header end
 	size_t header_end = _rawString.find("\r\n\r\n");
 	if (header_end == std::string::npos)
 		return (0);
+
 	size_t body_start = header_end + 4;
-	// If chunked, _bodyPos already points just past the final CRLF
-	if (_isChunked)
+
+	// If chunked, or if we computed a message-end position (multipart fallback), use it
+	if (_isChunked == true)
 		return (_bodyPos);
-	// Unchunked: use parsed content-length (0 for typical GET)
+
+	if (_useMultipartBoundary == true && _bodyComplete == true && _bodyPos > 0)
+		return (_bodyPos);
+
+	// Unchunked normal framing with Content-Length
 	return (body_start + _content_length);
 }
