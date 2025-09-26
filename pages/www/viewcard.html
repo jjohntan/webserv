@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WebServ • View Cards</title>
+  <meta name="description" content="Browse and edit saved profiles." />
+  <style>
+    :root{
+      --bg:#f7fafc; --card:#ffffff; --txt:#1c2540; --muted:#64748b; --border:#e6ecf2;
+      --accent:#4f8cff; --accent-2:#22c55e; --accent-3:#f59e0b; --danger:#ef4444;
+      --radius:18px; --shadow:0 14px 40px rgba(20,32,60,.08); --focus:0 0 0 3px rgba(79,140,255,.25);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      color:var(--txt); background:
+        radial-gradient(1200px 800px at -10% -10%, #e9f2ff 0%, transparent 70%) no-repeat,
+        radial-gradient(1200px 800px at 110% 10%, #eafff9 0%, transparent 70%) no-repeat,
+        var(--bg);
+      line-height:1.65; padding:28px 18px;
+    }
+    .wrap{max-width:1060px;margin:0 auto}
+    header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px}
+    .title{font-size:clamp(26px,4.2vw,40px); font-weight:800}
+    .subtitle{color:var(--muted); font-size:15px}
+
+    .card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:22px}
+    .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    .input{
+      flex:1; min-width:240px; padding:12px 14px; border:1px solid var(--border); border-radius:12px; font-size:16px; background:#fff;
+      box-shadow:0 6px 20px rgba(20,32,60,.04);
+    }
+    .btn{
+      appearance:none; border:1px solid var(--border); background:#ffffff; color:var(--txt);
+      padding:12px 16px; border-radius:12px; cursor:pointer; text-decoration:none; font-weight:800; font-size:16px;
+      box-shadow:0 6px 20px rgba(20,32,60,.06); transition:transform .08s ease, border-color .15s ease;
+    }
+    .btn:hover{transform:translateY(-1.5px); border-color:#d8e4f2}
+    .btn.primary{background:#eef4ff; border-color:#d9e7ff}
+    .grid{
+      display:grid; gap:16px; margin-top:16px;
+      grid-template-columns:1fr;
+    }
+    @media(min-width:640px){ .grid{grid-template-columns:1fr 1fr} }
+    @media(min-width:980px){ .grid{grid-template-columns:1fr 1fr 1fr} }
+
+    .p-card{
+      border:1px solid var(--border); border-radius:16px; padding:18px; box-shadow:0 10px 28px rgba(20,32,60,.06);
+      background:linear-gradient(180deg,#ffffff,#fbfdff);
+      display:flex; flex-direction:column; gap:8px; min-height:160px;
+    }
+    /* slight color variety */
+    .p-card:nth-child(3n+1){ background:linear-gradient(180deg,#ffffff,#f9fbff) }
+    .p-card:nth-child(3n+2){ background:linear-gradient(180deg,#ffffff,#f8fffb) }
+    .p-card:nth-child(3n){   background:linear-gradient(180deg,#ffffff,#fffaf2) }
+
+    .p-title{font-weight:900; font-size:18px}
+    .p-meta{color:var(--muted); font-size:14px}
+    .spacer{flex:1}
+    .row{display:flex; gap:10px; flex-wrap:wrap}
+    .chip{font-size:12px; padding:3px 8px; border-radius:999px; border:1px solid var(--border); background:#fff}
+    .edit{align-self:flex-start}
+
+    /* Modal */
+    dialog{
+      border:none; border-radius:16px; padding:0; width:min(560px, 92vw); overflow:hidden;
+      box-shadow:0 30px 80px rgba(20,32,60,.25);
+    }
+    .modal-head{padding:16px 18px; border-bottom:1px solid var(--border); font-weight:900}
+    .modal-body{padding:18px; display:grid; gap:12px}
+    .modal-foot{padding:14px 18px; border-top:1px solid var(--border); display:flex; gap:10px; justify-content:flex-end}
+    label{font-weight:700; font-size:14px}
+    input[type="text"], textarea, select{
+      width:100%; padding:12px 14px; border:1px solid var(--border); border-radius:12px; background:#fff; font-size:16px;
+    }
+    textarea{min-height:100px; resize:vertical}
+    .toast{
+      position:fixed; bottom:16px; right:16px; background:#0ea5e9; color:#fff; padding:10px 14px; border-radius:10px; box-shadow:0 10px 28px rgba(20,32,60,.25);
+      opacity:0; transform:translateY(8px); transition:all .25s ease;
+    }
+    .toast.show{opacity:1; transform:translateY(0)}
+    .empty{border:1px dashed var(--border); border-radius:14px; padding:18px; text-align:center; color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <div class="title">View Cards</div>
+        <div class="subtitle">Browse up to nine saved profiles. Search, then edit inline.</div>
+      </div>
+      <div>
+        <a class="btn" href="/">← Back</a>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="toolbar">
+        <input id="q" class="input" type="text" placeholder="Search by name…" />
+        <button class="btn primary" id="refresh">Refresh</button>
+        <a class="btn" href="/form.html">Register Card</a>
+      </div>
+
+      <div id="list" class="grid" role="list"></div>
+      <div id="empty" class="empty" style="display:none">No profiles found. Try <code>/cgi_bin/profile.py?list=1&format=json</code> or add one via “Register Card”.</div>
+    </section>
+  </div>
+
+  <!-- Edit Modal -->
+  <dialog id="editDialog" aria-labelledby="editTitle">
+    <div class="modal-head" id="editTitle">Edit Profile</div>
+    <form id="editForm" method="dialog">
+      <div class="modal-body">
+        <input type="hidden" name="id" id="f_id" />
+        <label for="f_name">Name</label>
+        <input type="text" id="f_name" name="name" required />
+        <label for="f_gender">Gender</label>
+        <select id="f_gender" name="gender" required>
+          <option>Female</option><option>Male</option><option>Non-binary</option><option>Prefer not to say</option>
+        </select>
+        <label for="f_hobby">Hobby</label>
+        <textarea id="f_hobby" name="hobby"></textarea>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" type="button" id="cancelEdit">Cancel</button>
+        <button class="btn primary" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const listEl = document.getElementById('list');
+    const emptyEl = document.getElementById('empty');
+    const qEl = document.getElementById('q');
+    const toastEl = document.getElementById('toast');
+
+    const dlg = document.getElementById('editDialog');
+    const form = document.getElementById('editForm');
+    const F = { id: document.getElementById('f_id'), name: document.getElementById('f_name'),
+                gender: document.getElementById('f_gender'), hobby: document.getElementById('f_hobby') };
+
+    let allProfiles = [];
+
+    function showToast(msg){
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      setTimeout(()=>toastEl.classList.remove('show'), 2200);
+    }
+
+    function cardTemplate(p){
+      const wrap = document.createElement('div');
+      wrap.className = 'p-card';
+      wrap.setAttribute('role','listitem');
+
+      const title = document.createElement('div');
+      title.className = 'p-title';
+      title.textContent = p.name || '(Unnamed)';
+
+      const meta = document.createElement('div');
+      meta.className = 'p-meta';
+      meta.textContent = (p.gender || '—');
+
+      const chips = document.createElement('div');
+      chips.className = 'row';
+      if (p.hobby) {
+        const c = document.createElement('span'); c.className = 'chip'; c.textContent = p.hobby;
+        chips.appendChild(c);
+      }
+
+      const spacer = document.createElement('div'); spacer.className='spacer';
+
+      const edit = document.createElement('button');
+      edit.className = 'btn edit';
+      edit.textContent = 'Edit';
+      edit.addEventListener('click', () => openEdit(p));
+
+      wrap.appendChild(title);
+      wrap.appendChild(meta);
+      wrap.appendChild(chips);
+      wrap.appendChild(spacer);
+      wrap.appendChild(edit);
+      return wrap;
+    }
+
+    function render(profiles){
+      const max9 = profiles.slice(0,9);
+      listEl.innerHTML = '';
+      if (max9.length === 0){
+        emptyEl.style.display = 'block';
+        return;
+      }
+      emptyEl.style.display = 'none';
+      max9.forEach(p => listEl.appendChild(cardTemplate(p)));
+    }
+
+    function applySearch(){
+      const q = (qEl.value || '').trim().toLowerCase();
+      const filtered = !q ? allProfiles : allProfiles.filter(p => (p.name||'').toLowerCase().includes(q));
+      render(filtered);
+    }
+
+    qEl.addEventListener('input', applySearch);
+    document.getElementById('refresh').addEventListener('click', fetchProfiles);
+
+    function openEdit(p){
+      F.id.value = p.id || '';
+      F.name.value = p.name || '';
+      F.gender.value = p.gender || 'Prefer not to say';
+      F.hobby.value = p.hobby || '';
+      dlg.showModal();
+    }
+
+    document.getElementById('cancelEdit').addEventListener('click', () => dlg.close());
+
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const payload = new URLSearchParams();
+      if (F.id.value) payload.append('id', F.id.value);
+      payload.append('_mode','update');
+      payload.append('name', F.name.value);
+      payload.append('gender', F.gender.value);
+      payload.append('hobby', F.hobby.value);
+
+      try{
+        const res = await fetch('/cgi_bin/profile.py', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
+          body: payload.toString()
+        });
+        if (!res.ok) throw new Error('Save failed: ' + res.status);
+        showToast('Saved!');
+        dlg.close();
+        await fetchProfiles(); // refresh list
+      }catch(err){
+        showToast(err.message || 'Save failed');
+      }
+    });
+
+    async function tryFetch(url){
+      const r = await fetch(url, { headers:{ 'Accept':'application/json' }});
+      if (!r.ok) return null;
+      const ct = r.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) return null;
+      return r.json();
+    }
+
+    async function fetchProfiles(){
+      // Expecting JSON like: { profiles: [{id,name,gender,hobby}, ...] }
+      let data = await tryFetch('/cgi_bin/profile.py?list=1');
+      if (!data) data = await tryFetch('/cgi_bin/profile.py?list=1&format=json');
+
+      if (data && Array.isArray(data.profiles)){
+        allProfiles = data.profiles.map(x => ({
+          id: x.id || x.name || '',
+          name: x.name || '',
+          gender: x.gender || '',
+          hobby: x.hobby || ''
+        }));
+      } else {
+        // fallback demo (empty list) – user can still register via form.html
+        allProfiles = [];
+      }
+      applySearch();
+    }
+
+    // initial load
+    fetchProfiles();
+  </script>
+</body>
+</html>
