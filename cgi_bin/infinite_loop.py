@@ -18,8 +18,9 @@ while True:
     sys.stdout.flush()
     time.sleep(1)  # Sleep for 1 second each iteration
     
-    # Safety break after 100 iterations (in case timeout doesn't work)
-    if counter > 100:
+    # Safety break after 200 iterations (in case timeout doesn't work)
+    # This should be much longer than the CGI timeout (10 seconds)
+    if counter > 200:
         print("<p>Safety break - timeout didn't work!</p>")
         break
 

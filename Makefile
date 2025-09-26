@@ -10,6 +10,7 @@ SOURCES = main.cpp \
           Server.cpp \
           config_files/config.cpp \
           cgi_handler/cgi.cpp \
+          cgi_handler/cgi_helper.cpp \
           http/HTTP.cpp \
           http/http_cgi.cpp \
           http/HTTPRequest/HTTPRequest.cpp \
@@ -21,6 +22,7 @@ OBJECTS = main.o \
           Server.o \
           config.o \
           cgi.o \
+          cgi_helper.o \
           HTTP.o \
           http_cgi.o \
           HTTPRequest.o \
@@ -29,9 +31,9 @@ OBJECTS = main.o \
 
 # Header files
 HEADERS = Server.hpp \
-HEADERS = Server.hpp \
           config_files/config.hpp \
           cgi_handler/cgi.hpp \
+          cgi_handler/cgi_helper.hpp \
           http/HTTPRequest/HTTPRequest.hpp \
           http/HTTPResponse/HTTPResponse.hpp \
           http/HTTP.hpp \
@@ -57,8 +59,11 @@ server.o: Server.cpp Server.hpp cgi_handler/cgi.hpp http/HTTPRequest/HTTPRequest
 config.o: config_files/config.cpp config_files/config.hpp
 	$(CXX) $(CXXFLAGS) -c config_files/config.cpp -o config.o
 
-cgi.o: cgi_handler/cgi.cpp cgi_handler/cgi.hpp http/HTTPRequest/HTTPRequest.hpp http/HTTPResponse/HTTPResponse.hpp
+cgi.o: cgi_handler/cgi.cpp cgi_handler/cgi.hpp cgi_handler/cgi_helper.hpp http/HTTPRequest/HTTPRequest.hpp http/HTTPResponse/HTTPResponse.hpp
 	$(CXX) $(CXXFLAGS) -c cgi_handler/cgi.cpp -o cgi.o
+
+cgi_helper.o: cgi_handler/cgi_helper.cpp cgi_handler/cgi_helper.hpp cgi_handler/cgi.hpp http/HTTPRequest/HTTPRequest.hpp
+	$(CXX) $(CXXFLAGS) -c cgi_handler/cgi_helper.cpp -o cgi_helper.o
 
 
 HTTP.o: http/HTTP.cpp http/HTTP.hpp http/http_cgi.hpp http/HTTPRequest/HTTPRequest.hpp http/HTTPResponse/HTTPResponse.hpp cgi_handler/cgi.hpp
