@@ -159,7 +159,9 @@ void Server::run()
 		checkTimeOut(request_map);
 		for (size_t i = 0; i < pfds.size(); i++)
 		{
-			 // Handle error-y revents (prevents “mystery hangs”)
+			// Handle error-y revents (prevents “mystery hangs”)
+			// POLLERR: An error has occurred on this socket.
+			// POLLNVAL: Invalid request: fd not open (only returned in revents; ignored in events)
 			if (pfds[i].revents & (POLLERR | POLLNVAL))
 			{
 				int fd = pfds[i].fd;
@@ -173,6 +175,7 @@ void Server::run()
 			}
 
 			// Handle exactly one write OR one read per client per poll tick
+			// POLLOUT: Alert me when I can send() data to this socket without blocking.
 			if (pfds[i].revents & POLLOUT)
 			{
 				int fd = pfds[i].fd;
@@ -224,6 +227,8 @@ void Server::run()
 			}
 
 			// check if someone ready to read (or closed)
+			// POLLIN: There is data to read
+			// POLLHUP: The remote side of the connection hung up.
 			if (pfds[i].revents & (POLLIN | POLLHUP))
 			{
 				// if is listener, it is a new connection
@@ -264,12 +269,12 @@ int Server::createListeningSocket(const std::string& port_str)
 	struct addrinfo hints, *ai, *ptr;
 	
 	// get host info, make socket, and connect it
-	memset(&hints, 0, sizeof(hints));
+	memset(&hints, 0, sizeof(hints));// make sure the struct is empty
 	hints.ai_family = AF_INET;       // use IPv4
 	hints.ai_socktype = SOCK_STREAM; // TCP strream sockets
 	hints.ai_flags = AI_PASSIVE;// use my IP address
 
-	//Allocate memory and create a new linked list of addrinfo
+	// Allocate memory and create a new linked list of addrinfo
 	if ((res = getaddrinfo(NULL, port_str.c_str(), &hints, &ai)) != 0)
 	{
 		fprintf(stderr, "server: %s\n", gai_strerror(res));
@@ -287,7 +292,7 @@ int Server::createListeningSocket(const std::string& port_str)
 		{
 			continue;
 		}
-		// [ADD] If you want non-blocking listeners, set it **after** socket()
+		// non-blocking listeners, set after socket()
 		// Set to non-blocking
 		fcntl(sockfd, F_SETFL, O_NONBLOCK);
 		
@@ -340,12 +345,13 @@ int Server::createListeningSocket(const std::string& port_str)
 
 bool Server::start()
 {
+	std::set<int> ports;// set automatically ensures that each port number appears only once, and keeps sorted in ascending order.
 	// collect unique ports from servers and create a listening socket for each
-	std::set<int> ports;
 	for (size_t i = 0; i < servers.size(); ++i)
 	{
 		ports.insert(servers[i].port);
 	}
+	
 	// if no servers provided, fall back to default socket_fd if previously set
 	if (ports.empty())
 	{
@@ -354,11 +360,13 @@ bool Server::start()
 		return fd >= 0;
 	}
 
+	// create listening socket for each port
 	for (std::set<int>::const_iterator it = ports.begin(); it != ports.end(); ++it)
 	{
 		std::ostringstream oss;
-		oss << *it;
+		oss << *it;// convert it to string
 		int fd = createListeningSocket(oss.str());
+		
 		if (fd < 0)
 		{
 			std::cerr << "Failed to create listening socket on port " << *it << std::endl;
@@ -384,7 +392,7 @@ Server::~Server()
 	}
 }
 
-// ============================ Helpers ============================  // [ADD]
+// ============================ Helpers ============================  //
 
 /*
 	Tell poll() that you have something to write
@@ -429,7 +437,7 @@ void Server::queueResponse(int fd, const std::string& data)
 	enableWrite(fd);
 }
 
-// [ADD] Ask to close once all queued bytes are sent
+// Ask to close once all queued bytes are sent
 void Server::markCloseAfterWrite(int fd)
 {
 	std::map<int, ClientState>::iterator it = client_state_.find(fd);
