@@ -711,18 +711,18 @@ else
 fi
 
 # 2) Test duplicate port with different server names (should work)
-say "Testing duplicate port 8084 with different server names..."
+say "Testing duplicate port 8085 with different server names..."
 DIFFERENT_CONFIG="${TMP_DIR}/different_test.conf"
 cat > "$DIFFERENT_CONFIG" << 'EOF'
 server {
-    listen 127.0.0.1:8084;
+    listen 127.0.0.1:8085;
     server_name server1.localhost;
     root ./pages/www;
     client_max_body_size 10M;
 }
 
 server {
-    listen 127.0.0.1:8084;
+    listen 127.0.0.1:8085;
     server_name server2.localhost;
     root ./pages/www;
     client_max_body_size 5M;
@@ -963,7 +963,7 @@ if have_cmd siege; then
     throughput="$(echo "$siege_out" | grep -o '"throughput":[[:space:]]*[0-9.]*' | grep -o '[0-9.]*')"
   else
     # Legacy text format parsing
-    avail="$(awk -F': *' '/Availability/ {gsub(/%/,"",$2); print $2}' <<<"$siege_out" | tail -n1)"
+  avail="$(awk -F': *' '/Availability/ {gsub(/%/,"",$2); print $2}' <<<"$siege_out" | tail -n1)"
     trans="$(awk -F': *' '/Transactions/ {print $2}' <<<"$siege_out" | tail -n1)"
     elapsed="$(awk -F': *' '/Elapsed time/ {print $2}' <<<"$siege_out" | tail -n1)"
     data_trans="$(awk -F': *' '/Data transferred/ {print $2}' <<<"$siege_out" | tail -n1)"
