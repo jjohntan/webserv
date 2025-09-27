@@ -17,7 +17,6 @@
 #include "../http/HTTP.hpp"
 #include "../http/HTTPRequest/HTTPRequest.hpp"
 
-
 class Server
 {
 	private:

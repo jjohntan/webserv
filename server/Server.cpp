@@ -115,30 +115,31 @@ void Server::checkTimeOut(std::map<int, HTTPRequest> request_map)
 {
 	time_t current_time = time(NULL);
 	for (size_t i = 0; i < pfds.size(); i++)
+	{
+		int fd = pfds[i].fd;
+		
+		// Skip listening sockets for timeout checking
+		if (isListeningSocket(fd))
+			continue;
+		
+		// If this file descriptor exists in my activity map and the client has been idle longer than the timeout, then close the connection.
+		if (last_activity.count(fd) && (current_time - last_activity[fd] > timeout))
 		{
-			int fd = pfds[i].fd;
+			std::cout << "Timeout closing fd " << fd << " (idle for " << (current_time - last_activity[fd]) << "s)" << std::endl;
 			
-			// Skip listening sockets for timeout checking
-			if (isListeningSocket(fd))
-				continue;
-				
-			if (last_activity.count(fd) && (current_time - last_activity[fd] > timeout))
-			{
-				std::cout << "Timeout closing fd " << fd << " (idle for " << (current_time - last_activity[fd]) << "s)" << std::endl;
-				
-				// Send proper 408 timeout response
-				sendTimeoutResponse(fd);
-				
-				// Clean up
-				close(fd);
-				client_state_.erase(fd);
-				request_map.erase(fd);
-				last_activity.erase(fd);
-				removePfds(i);
-				--i; // Adjust index after removal
-				continue;
-			}
+			// Send 408 timeout response
+			sendTimeoutResponse(fd);
+			
+			// Clean up
+			close(fd);
+			client_state_.erase(fd);
+			request_map.erase(fd);
+			last_activity.erase(fd);
+			removePfds(i);
+			--i; // Adjust index after removal
+			continue;
 		}
+	}
 }
 
 // Main loop
@@ -245,7 +246,7 @@ void Server::run()
 			pfds[i].revents = 0;
 		}
 	}
-	 // Close all client connections
+	// Close all client connections
 	for (size_t i = 0; i < pfds.size(); i++)
 	{
 		if (pfds[i].fd >= 0)
