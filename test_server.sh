@@ -141,6 +141,12 @@ done
 : > "$LOG_FILE"
 say "=== Starting regression tests ==="
 say "started ${BIN_PATH} (with ${CFG_FILE})"
+
+# Ensure CGI scripts are executable before starting tests
+if compgen -G "cgi_bin/*.py" > /dev/null; then
+  chmod +x cgi_bin/*.py 2>/dev/null || true
+fi
+
 "${BIN_PATH}" "${CFG_FILE}" >>"$LOG_FILE" 2>&1 &
 SERVER_PID=$!
 
