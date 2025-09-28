@@ -1,6 +1,9 @@
 #include "Server.hpp"
 #include <csignal>
 
+//volatile: tells the compiler not to optimize this variable away, because it might change unexpectedly
+volatile sig_atomic_t g_running = true;
+
 void sendTimeoutResponse(int fd)
 {
 	// Read the 408.html file
@@ -32,8 +35,6 @@ void sendTimeoutResponse(int fd)
 	std::cout << "Sent 408 timeout response to fd " << fd << std::endl;
 }
 
-volatile sig_atomic_t g_running = true;
-
 void signalHandler(int signum)
 {
 	(void)signum;
@@ -43,11 +44,11 @@ void signalHandler(int signum)
 void setupSignalHandler()
 {
 	struct sigaction sa;
-	sa.sa_handler = signalHandler;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = 0;
-	sigaction(SIGINT, &sa, NULL);
-	sigaction(SIGTERM, &sa, NULL);
+	sa.sa_handler = signalHandler;// which function to call
+	sigemptyset(&sa.sa_mask);// don't block other signal during handler
+	sa.sa_flags = 0;// no special behavior
+	sigaction(SIGINT, &sa, NULL);// attach handler for ctrl + c
+	sigaction(SIGTERM, &sa, NULL);// attach handler for kill pid
 }
 
 /**
@@ -182,7 +183,7 @@ void Server::run()
 				int fd = pfds[i].fd; // Get the file descriptor for this client
 				// Find the client state for this fd
 				std::map<int, ClientState>::iterator csit = client_state_.find(fd);
-				// If we have no state for this fd, or nothing left to send, stop POLLOUT
+				// If we have no state for this fd, or nothing left to send, stop POLLOUT(send buffer empty)
 				if (csit == client_state_.end() || csit->second.outbox.empty())
 				{
 					disableWrite(fd); // Remove POLLOUT event, nothing to write
@@ -190,6 +191,7 @@ void Server::run()
 				else
 				{
 					// Get the data buffer to send
+					// second: the value
 					const std::string &buf = csit->second.outbox;
 					// Try to send as much as possible in one go
 					ssize_t n = send(fd, buf.data(), buf.size(), 0);
@@ -428,6 +430,7 @@ void Server::enableWrite(int fd)
 /*
 	Tell poll() that you have nothing to write
 	"~Flags" means inverse the bits
+	&= keeps everything else, but clears the POLLOUT bit.
 
 	Suppose POLLIN = 0b0001, POLLOUT = 0b0100.
 	Current events = 0b0101 (POLLIN + POLLOUT).
@@ -448,7 +451,7 @@ void Server::disableWrite(int fd)
 
 void Server::queueResponse(int fd, const std::string& data)
 {
-	client_state_[fd].outbox.append(data);
+	client_state_[fd].outbox.append(data);// store response
 	enableWrite(fd);
 }
 
