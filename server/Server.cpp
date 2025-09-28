@@ -179,40 +179,48 @@ void Server::run()
 			// POLLOUT: Alert me when I can send() data to this socket without blocking.
 			if (pfds[i].revents & POLLOUT)
 			{
-				int fd = pfds[i].fd;
+				int fd = pfds[i].fd; // Get the file descriptor for this client
+				// Find the client state for this fd
 				std::map<int, ClientState>::iterator csit = client_state_.find(fd);
+				// If we have no state for this fd, or nothing left to send, stop POLLOUT
 				if (csit == client_state_.end() || csit->second.outbox.empty())
 				{
-					disableWrite(fd); // nothing to write; stop POLLOUT
+					disableWrite(fd); // Remove POLLOUT event, nothing to write
 				}
 				else
 				{
+					// Get the data buffer to send
 					const std::string &buf = csit->second.outbox;
+					// Try to send as much as possible in one go
 					ssize_t n = send(fd, buf.data(), buf.size(), 0);
 					if (n > 0)
 					{
-						// remove the bytes we wrote (single write per poll)
+						// Remove the bytes that were successfully sent
 						csit->second.outbox.erase(0, static_cast<size_t>(n));
+						// If all data has been sent
 						if (csit->second.outbox.empty())
 						{
+							// If we want to close after sending (Connection close)
 							if (csit->second.close_after_write)
 							{
-								// graceful close after fully flushed
+								// Close the socket and clean up all state
 								close(fd);
 								client_state_.erase(fd);
 								request_map.erase(fd);
 								last_activity.erase(fd);
 								pfds.erase(pfds.begin() + i);
-								--i;
-								// do not touch pfds[i].revents after erase
+								--i; // Adjust index after erase
+								// Don't touch pfds[i].revents after erase
 								continue;
 							}
-							disableWrite(fd); // switch back to read-only
+							// Otherwise, just stop POLLOUT and go back to read-only
+							disableWrite(fd);
 						}
 					}
 					else
 					{
-						// DO NOT inspect errno; generic log and close.
+						// If send() failed (n <= 0), log and close the connection
+						// Do NOT inspect errno, just close and clean up
 						std::cerr << "send failed on fd " << fd << "\n";
 						close(fd);
 						client_state_.erase(fd);
@@ -222,9 +230,12 @@ void Server::run()
 						--i;
 					}
 				}
+				// Reset revents for this pollfd (we handled the event)
 				pfds[i].revents = 0;
+				// Update last activity time for this client
 				last_activity[fd] = time(NULL);
-				continue; // one write OR one read per poll tick
+				// Only one write OR one read per poll tick, so continue
+				continue;
 			}
 
 			// check if someone ready to read (or closed)
@@ -267,6 +278,8 @@ int Server::createListeningSocket(const std::string& port_str)
 {
 	int opt = 1;
 	int res;
+	// ai: pointer to addinfo,point to the head of a linked list(first node)
+	// ptr: traverse the linked list
 	struct addrinfo hints, *ai, *ptr;
 	
 	// get host info, make socket, and connect it
@@ -300,6 +313,7 @@ int Server::createListeningSocket(const std::string& port_str)
 		// set sockfd to allow multiple connection
 		setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
 		
+		// bind it to the port we passed in to getaddrinfo():
 		if (bind(sockfd, ptr->ai_addr, ptr->ai_addrlen) < 0)
 		{
 			close(sockfd);
@@ -337,8 +351,8 @@ int Server::createListeningSocket(const std::string& port_str)
 	// also add to poll set
 	struct pollfd pfd;
 	pfd.fd = sockfd;// the socket descriptor
-	pfd.events = POLLIN;// check ready to read
-	pfd.revents = 0;
+	pfd.events = POLLIN;// check ready to read(what u ask)
+	pfd.revents = 0;// result of events(what u get)
 	pfds.push_back(pfd);
 
 	return sockfd;
