@@ -5,7 +5,7 @@ CGI_DIR = cgi_bin
 UPLOAD_DIR = ./pages/upload
 
 # Target executable
-WEBSERVER = webserver
+WEBSERVER = webserv
 
 # Source files
 SOURCES = main.cpp \
