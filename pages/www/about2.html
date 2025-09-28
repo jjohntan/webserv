@@ -57,6 +57,18 @@
       transition:transform .08s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease; font-size:14px;
     }
     .btn:hover{transform:translateY(-1px); border-color:#d8e4f2}
+    .hidden{display:none}
+    .tabbar{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin:10px 0;
+      justify-content:center;   /* ⬅ centers the tab buttons */
+    }
+
+    .tab{appearance:none; border:1px solid var(--border); background:#fff; padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:700; box-shadow:var(--shadow-sm); font-size:13px}
+    .tab[aria-pressed="true"]{background:#f5f8ff; border-color:#d8e4f2}
+    .note{margin-top:8px; font-size:12px; color:var(--muted)}
   </style>
 </head>
 <body>
@@ -203,6 +215,213 @@ Connection: close
       </div>
     </section>
 
+     <!-- HTTP Raw String Example -->
+    <section class="card">
+      <h2><span class="kawaii">🧾</span> HTTP Raw String Example</h2>
+      <p class="muted">A curated set of copy-ready raw messages. Use them with tools like <code>nc</code>/<code>telnet</code> or for eyeballing header shapes. Lines shown with CRLF newlines.</p>
+
+      <!-- Top-level group switch -->
+      <div class="row" style="margin-top:6px">
+        <button id="btn-group-req" class="btn" type="button" onclick="switchGroup('req')" aria-pressed="true">HTTP Request Raw String</button>
+        <button id="btn-group-res" class="btn" type="button" onclick="switchGroup('res')" aria-pressed="false">HTTP Response Raw String</button>
+      </div>
+
+      <!-- ===================== -->
+      <!-- Requests: multiple examples -->
+      <!-- ===================== -->
+      <div id="raw-requests-wrap" class="grid" style="margin-top:8px">
+        <!-- Tabs for request variants -->
+        <div class="tabbar">
+          <button class="tab" data-target="ex-get-plain"   onclick="showExample('raw-requests-wrap','ex-get-plain')"   aria-pressed="true">GET • Unchunked</button>
+          <button class="tab" data-target="ex-get-chunked" onclick="showExample('raw-requests-wrap','ex-get-chunked')" aria-pressed="false">GET • Chunked*</button>
+          <button class="tab" data-target="ex-get-query"   onclick="showExample('raw-requests-wrap','ex-get-query')"   aria-pressed="false">GET • Query</button>
+          <button class="tab" data-target="ex-post-form"   onclick="showExample('raw-requests-wrap','ex-post-form')"   aria-pressed="false">POST • Form</button>
+          <button class="tab" data-target="ex-post-multi"  onclick="showExample('raw-requests-wrap','ex-post-multi')"  aria-pressed="false">POST • Multipart</button>
+          <button class="tab" data-target="ex-delete"      onclick="showExample('raw-requests-wrap','ex-delete')"      aria-pressed="false">DELETE</button>
+        </div>
+
+        <!-- GET — Unchunked (typical, no body) -->
+        <pre data-example id="ex-get-plain"><code>GET /images/logo.png HTTP/1.1
+    Host: localhost:8080
+    User-Agent: curl/8.7
+    Accept: */*
+    Connection: keep-alive
+
+    </code></pre>
+
+        <!-- GET — Chunked (rare; servers may ignore body for GET) -->
+        <pre data-example id="ex-get-chunked" class="hidden"><code>GET /inspect HTTP/1.1
+    Host: localhost:8080
+    User-Agent: demo-client/1.0
+    Transfer-Encoding: chunked
+    Trailer: X-Demo-Trailer
+    Connection: keep-alive
+
+    4
+    Wooo
+    0
+    X-Demo-Trailer: done
+
+    </code></pre>
+        <div class="note">*Chunked request bodies are legal in HTTP/1.1, but uncommon for <code>GET</code>. Many servers ignore a GET body.</div>
+
+        <!-- GET — Query -->
+        <pre data-example id="ex-get-query" class="hidden"><code>GET /search?q=webserv&amp;page=2&amp;sort=updated HTTP/1.1
+    Host: localhost:8080
+    User-Agent: curl/8.7
+    Accept: text/html,application/xhtml+xml
+    Connection: keep-alive
+
+    </code></pre>
+
+        <!-- POST — application/x-www-form-urlencoded -->
+        <pre data-example id="ex-post-form" class="hidden"><code>POST /api/login HTTP/1.1
+    Host: localhost:8080
+    Content-Type: application/x-www-form-urlencoded
+    Content-Length: 29
+    Connection: keep-alive
+
+    username=alice&amp;password=secret</code></pre>
+
+        <!-- POST — multipart/form-data -->
+        <pre data-example id="ex-post-multi" class="hidden"><code>POST /cgi_bin/upload2.py HTTP/1.1
+    Host: localhost:8080
+    Content-Type: multipart/form-data; boundary=----WebServBoundary
+    Connection: keep-alive
+
+    ------WebServBoundary
+    Content-Disposition: form-data; name="file"; filename="cat.png"
+    Content-Type: image/png
+
+    ...binary...
+    ------WebServBoundary--</code></pre>
+
+        <!-- DELETE -->
+        <pre data-example id="ex-delete" class="hidden"><code>DELETE /upload/old-file.txt HTTP/1.1
+    Host: localhost:8080
+    User-Agent: curl/8.7
+    Connection: close
+
+    </code></pre>
+      </div>
+
+      <!-- ===================== -->
+      <!-- Responses: multiple examples -->
+      <!-- ===================== -->
+      <div id="raw-responses-wrap" class="grid hidden" style="margin-top:8px">
+        <!-- Tabs for response variants -->
+        <div class="tabbar">
+          <button class="tab" data-target="ex-200" onclick="showExample('raw-responses-wrap','ex-200')" aria-pressed="true">200 OK</button>
+          <button class="tab" data-target="ex-201" onclick="showExample('raw-responses-wrap','ex-201')" aria-pressed="false">201 Created</button>
+          <button class="tab" data-target="ex-204" onclick="showExample('raw-responses-wrap','ex-204')" aria-pressed="false">204 No Content</button>
+          <button class="tab" data-target="ex-301" onclick="showExample('raw-responses-wrap','ex-301')" aria-pressed="false">301 Redirect</button>
+          <button class="tab" data-target="ex-302" onclick="showExample('raw-responses-wrap','ex-302')" aria-pressed="false">302 Found</button>
+          <button class="tab" data-target="ex-304" onclick="showExample('raw-responses-wrap','ex-304')" aria-pressed="false">304 Not Modified</button>
+          <button class="tab" data-target="ex-400" onclick="showExample('raw-responses-wrap','ex-400')" aria-pressed="false">400 Bad Request</button>
+          <button class="tab" data-target="ex-404" onclick="showExample('raw-responses-wrap','ex-404')" aria-pressed="false">404 Not Found</button>
+          <button class="tab" data-target="ex-405" onclick="showExample('raw-responses-wrap','ex-405')" aria-pressed="false">405 Method Not Allowed</button>
+          <button class="tab" data-target="ex-413" onclick="showExample('raw-responses-wrap','ex-413')" aria-pressed="false">413 Payload Too Large</button>
+          <button class="tab" data-target="ex-500" onclick="showExample('raw-responses-wrap','ex-500')" aria-pressed="false">500 Internal Server Error</button>
+        </div>
+
+        <!-- 200 OK -->
+        <pre data-example id="ex-200"><code>HTTP/1.1 200 OK
+    Date: Sun, 28 Sep 2025 11:11:11 GMT
+    Content-Type: text/html; charset=utf-8
+    Content-Length: 1287
+    Connection: keep-alive
+
+    &lt;!doctype html&gt;...body...</code></pre>
+
+        <!-- 201 Created -->
+        <pre data-example id="ex-201" class="hidden"><code>HTTP/1.1 201 Created
+    Date: Sun, 28 Sep 2025 11:11:11 GMT
+    Location: /upload/new-file.txt
+    Content-Length: 0
+    Connection: keep-alive
+
+    </code></pre>
+
+        <!-- 204 No Content -->
+        <pre data-example id="ex-204" class="hidden"><code>HTTP/1.1 204 No Content
+    Date: Sun, 28 Sep 2025 11:11:11 GMT
+    Content-Length: 0
+    Connection: keep-alive
+
+    </code></pre>
+
+        <!-- 301 Moved Permanently -->
+        <pre data-example id="ex-301" class="hidden"><code>HTTP/1.1 301 Moved Permanently
+    Date: Sun, 28 Sep 2025 11:11:11 GMT
+    Location: /new/path
+    Content-Length: 0
+    Connection: close
+
+    </code></pre>
+
+        <!-- 302 Found -->
+        <pre data-example id="ex-302" class="hidden"><code>HTTP/1.1 302 Found
+    Date: Sun, 28 Sep 2025 11:11:11 GMT
+    Location: /temporary
+    Content-Length: 0
+    Connection: close
+
+    </code></pre>
+
+        <!-- 304 Not Modified -->
+        <pre data-example id="ex-304" class="hidden"><code>HTTP/1.1 304 Not Modified
+    Date: Sun, 28 Sep 2025 11:11:11 GMT
+    ETag: "abc123"
+    Connection: keep-alive
+
+    </code></pre>
+
+        <!-- 400 Bad Request -->
+        <pre data-example id="ex-400" class="hidden"><code>HTTP/1.1 400 Bad Request
+    Date: Sun, 28 Sep 2025 11:11:11 GMT
+    Content-Type: text/html; charset=utf-8
+    Content-Length: 0
+    Connection: close
+
+    </code></pre>
+
+        <!-- 404 Not Found -->
+        <pre data-example id="ex-404" class="hidden"><code>HTTP/1.1 404 Not Found
+    Date: Sun, 28 Sep 2025 11:11:11 GMT
+    Content-Type: text/html; charset=utf-8
+    Content-Length: 0
+    Connection: close
+
+    </code></pre>
+
+        <!-- 405 Method Not Allowed -->
+        <pre data-example id="ex-405" class="hidden"><code>HTTP/1.1 405 Method Not Allowed
+    Date: Sun, 28 Sep 2025 11:11:11 GMT
+    Allow: GET, POST
+    Content-Length: 0
+    Connection: close
+
+    </code></pre>
+
+        <!-- 413 Payload Too Large -->
+        <pre data-example id="ex-413" class="hidden"><code>HTTP/1.1 413 Payload Too Large
+    Date: Sun, 28 Sep 2025 11:11:11 GMT
+    Content-Length: 0
+    Connection: close
+
+    </code></pre>
+
+        <!-- 500 Internal Server Error -->
+        <pre data-example id="ex-500" class="hidden"><code>HTTP/1.1 500 Internal Server Error
+    Date: Sun, 28 Sep 2025 11:11:11 GMT
+    Content-Type: text/html; charset=utf-8
+    Content-Length: 0
+    Connection: close
+
+    </code></pre>
+      </div>
+    </section>
+
     <!-- Routing & Execution -->
     <section class="card">
       <h2><span class="kawaii">🗺️</span> Routing &amp; Execution</h2>
@@ -260,7 +479,59 @@ sys.stdout.write("&lt;h1&gt;Hello CGI&lt;/h1&gt;")</code></pre>
         <a class="btn" href="/index2.html">Back to Home</a>
       </div>
     </section>
+    <script>
+      function showRaw(which)
+      {
+      var req = document.getElementById('raw-req');
+      var res = document.getElementById('raw-res');
+      if(!req || !res) return;
+      if (which === 'req') { req.classList.remove('hidden'); res.classList.add('hidden'); }
+      else { res.classList.remove('hidden'); req.classList.add('hidden'); }
+      }
 
+      // High-level tab: 'req' or 'res'
+      function switchGroup(group){
+        var reqWrap = document.getElementById('raw-requests-wrap');
+        var resWrap = document.getElementById('raw-responses-wrap');
+        var reqBtn  = document.getElementById('btn-group-req');
+        var resBtn  = document.getElementById('btn-group-res');
+        if(!reqWrap || !resWrap) return;
+
+        if(group === 'req'){
+          reqWrap.classList.remove('hidden'); resWrap.classList.add('hidden');
+          reqBtn.setAttribute('aria-pressed','true'); resBtn.setAttribute('aria-pressed','false');
+        }else{
+          resWrap.classList.remove('hidden'); reqWrap.classList.add('hidden');
+          resBtn.setAttribute('aria-pressed','true'); reqBtn.setAttribute('aria-pressed','false');
+        }
+      }
+
+      // Show a specific <pre> by id and hide siblings inside a container
+      function showExample(containerId, exampleId){
+        var box = document.getElementById(containerId);
+        if(!box) return;
+        var blocks = box.querySelectorAll('pre[data-example]');
+        blocks.forEach(function(p){ p.classList.add('hidden'); });
+        var target = document.getElementById(exampleId);
+        if(target) target.classList.remove('hidden');
+
+        // Tab pressed state sync
+        var tabbar = box.querySelector('.tabbar');
+        if(tabbar){
+          tabbar.querySelectorAll('.tab').forEach(function(b){ b.setAttribute('aria-pressed','false'); });
+          var activeBtn = tabbar.querySelector('[data-target="'+exampleId+'"]');
+          if(activeBtn) activeBtn.setAttribute('aria-pressed','true');
+        }
+      }
+
+      // Optional: default selections on load
+      document.addEventListener('DOMContentLoaded', function(){
+        switchGroup('req');                            // show Requests by default
+        showExample('raw-requests-wrap','ex-get-plain');  // default request example
+        showExample('raw-responses-wrap','ex-200');       // default response example
+      });
+
+    </script>
     <footer>WebServ • C++98 • poll() • RFC 9110–9112</footer>
   </div>
 </body>

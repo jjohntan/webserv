@@ -1,38 +1,32 @@
 #include "http_cgi.hpp"
-#include "HTTPResponse/HTTPResponse.hpp"
-#include "HTTPResponse/ErrorResponse.hpp"
-#include "HTTP.hpp"
-#include <fstream>
-#include <dirent.h>
-#include <sstream>
-#include <iostream>
-#include <sys/stat.h>
-#include <unistd.h>
-#include "../server/Server.hpp" 
-
 
 static void stripCgiStatusHeader(std::string& headersAndBody)
 {
-	// Only look in the header section before the first CRLFCRLF
+	// only look for the first occurrence of \r\n\r\n, avoid duplicate
 	size_t hdr_end = headersAndBody.find("\r\n\r\n");
 	if (hdr_end == std::string::npos) return;
+	//split header and body
 	std::string header = headersAndBody.substr(0, hdr_end);
 	std::string body   = headersAndBody.substr(hdr_end + 4);
 
 	std::istringstream hs(header);
 	std::ostringstream newHdr;
 	std::string line;
+
+	//clean up line endings 
 	while (std::getline(hs, line)) {
 		if (!line.empty() && line[line.size()-1]=='\r') line.erase(line.size()-1,1);
 		std::string lower = line;
 		for (size_t i=0;i<lower.size();++i) lower[i] = std::tolower((unsigned char)lower[i]);
 		if (lower.rfind("status:", 0) == 0) {
-			// drop this line
+			// skip if status header found
 			continue;
 		}
-		newHdr << line << "\r\n";
+		newHdr << line << "\r\n"; // newHdr = "Content-Type: text/html\r\n" for proper ending
 	}
+	//Combines cleaned headers with body
 	headersAndBody = newHdr.str() + "\r\n" + body;
+	// headersAndBody = "Content-Type: text/html\r\n\r\n<html>About</html>"
 }
 
 
@@ -119,16 +113,13 @@ std::string generateDirectoryListing(const std::string& dirPath)
 
 const ServerConfig* findServerConfig(const HTTPRequest& request, const std::vector<ServerConfig>& servers) {
 	
-    const std::map<std::string, std::string>& headers = request.getHeaderMap();
-	std::map<std::string, std::string>::const_iterator host_it = headers.find("host");
-	std::string host = (host_it != headers.end()) ? host_it->second : "";
-	
-	// Extract port from host header (e.g., "localhost:8081" -> "8081")
-	size_t colon_pos = host.find(':');
-	std::string port_str = (colon_pos != std::string::npos) ? host.substr(colon_pos + 1) : "80";
-	
-	// Convert port string to int
-	int port = atoi(port_str.c_str());
+    // Inside findServerConfig() function:
+	const std::map<std::string, std::string>& headers = request.getHeaderMap();
+	std::string host = headers.find("host")->second;  // "localhost:8081"
+	size_t colon_pos = host.find(':');               // Find ":"
+	std::string port_str = host.substr(colon_pos + 1); // Extract "8081"
+	int port = atoi(port_str.c_str());               // Convert to 8081 (int)
+	// Loop through servers and match by port
 	
 	// Find matching server configuration
 	for (size_t i = 0; i < servers.size(); ++i) {
@@ -169,8 +160,6 @@ std::map<std::string, std::string> getCGIExtensions(const std::string& path, con
 
 
 
-
-// Helper function to parse multipart form data and extract file content
 std::string parseMultipartData(const std::string& body, const std::string& boundary, std::string& filename) {
 	if (boundary.empty()) {
 		return "";
@@ -183,14 +172,15 @@ std::string parseMultipartData(const std::string& body, const std::string& bound
 		return "";
 	}
 	
-	// Find the end of headers (double CRLF)
+	// Finds where headers end and file content begins
 	size_t header_end = body.find("\r\n\r\n", boundary_pos);
 	if (header_end == std::string::npos) {
 		return "";
 	}
 	
-	// Extract filename from Content-Disposition header
+	// Extract header between boundary and \r\n\r\n
 	std::string headers = body.substr(boundary_pos, header_end - boundary_pos);
+	// extract filename from headers
 	size_t filename_pos = headers.find("filename=\"");
 	if (filename_pos != std::string::npos) {
 		filename_pos += 10; // Skip "filename=\""
@@ -208,7 +198,7 @@ std::string parseMultipartData(const std::string& body, const std::string& bound
 		return body.substr(content_start);
 	}
 	
-	// Remove trailing \r\n before next boundary
+	// Clean up and Removes trailing \r\n from file content
 	std::string content = body.substr(content_start, next_boundary - content_start);
 	if (content.length() >= 2 && content.substr(content.length() - 2) == "\r\n") {
 		content = content.substr(0, content.length() - 2);
@@ -216,16 +206,16 @@ std::string parseMultipartData(const std::string& body, const std::string& bound
 	
 	return content;
 }
-
-// Helper function to handle file uploads 
+ 
 bool handleFileUpload(const HTTPRequest& request, const std::string& upload_path, int socketFD, const ServerConfig* server_config, Server& srv) {
+	// Gets the HTTP request body (contains the file data)
 	std::string body = request.getRawBody();
 	if (body.empty()) {
 		sendError(400, "Bad Request", socketFD, server_config, &request, srv);
 		return false;
 	}
 	
-	// Create upload directory if it doesn't exist
+	// Create upload directory if it doesn't exist with permission
 	if (access(upload_path.c_str(), F_OK) != 0) {
 		if (mkdir(upload_path.c_str(), 0755) != 0) {
 			sendError(500, "Internal Server Error", socketFD, server_config, &request, srv);
@@ -252,7 +242,12 @@ bool handleFileUpload(const HTTPRequest& request, const std::string& upload_path
 			file_content = parseMultipartData(body, boundary, filename);
 		}
 	} else {
-		// Simple binary upload
+		// direct upload without html
+		/*
+		Request: POST /upload/myfile.jpg
+		request.getPath() = "/upload/myfile.jpg"
+		filename = "myfile.jpg" (after last /)
+		*/
 		file_content = body;
 		// Extract filename from path
 		filename = request.getPath();
@@ -274,9 +269,14 @@ bool handleFileUpload(const HTTPRequest& request, const std::string& upload_path
 		return false;
 	}
 	
-	std::string file_path = upload_path + "/" + filename;
+	std::string file_path = upload_path + "/" + filename; // file_path = "./pages/upload/test.txt"
 	
-	// Write file
+	/*
+	Open file for binary writing
+	Check if opened successfully (disk space, permissions, etc.)
+	Write raw bytes from file_content
+	Close file
+	*/
 	std::ofstream file(file_path.c_str(), std::ios::binary);
 	if (!file.is_open()) {
 		sendError(500, "Internal Server Error", socketFD, server_config, &request, srv);
@@ -299,10 +299,9 @@ bool handleFileUpload(const HTTPRequest& request, const std::string& upload_path
 bool handleFileDeletion(const HTTPRequest& request, const std::string& server_root, int socketFD, const ServerConfig* server_config, Server& srv) {
 	std::string path = request.getPath();
 	
-	// For upload directory, use the upload path instead of server root
+	// load upload directory, use the upload path instead of server root
 	std::string file_path;
 	if (path.find("/upload/") == 0) {
-		// This is an upload file, use the upload directory
 		file_path = "./pages/upload" + path.substr(7); // Remove "/upload" prefix
 	} else {
 		file_path = server_root + path;
@@ -327,8 +326,8 @@ bool handleFileDeletion(const HTTPRequest& request, const std::string& server_ro
 	return true;
 }
 
-// Main function to handle CGI checking and file serving
-void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std::vector<ServerConfig>& servers, Server& srv) // [CHANGE]
+// Main function to processes incoming HTTP requests and decides whether to serve static files, execute CGI scripts
+void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std::vector<ServerConfig>& servers, Server& srv) 
 {
 	std::string path = request.getPath();
 
@@ -354,30 +353,31 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 			// Execute CGI
 			std::cout << "Executing CGI Script: " << script_path << std::endl;
 			CGIResult cgi_result = runCGI(request, script_path, cgi_extensions, working_directory);
-			// [ADD] Remove any "Status:" header from CGI payload to avoid duplicate status signaling
 			std::string cgiPayload = cgi_result.content;
 			stripCgiStatusHeader(cgiPayload);
 			HTTPResponse response(cgi_result.status_message, cgi_result.status_code, cgiPayload, socketFD);
 			std::cout << "Queue CGI Response\n";
+			// Add to server queue
 			srv.queueResponse(socketFD, response.getRawResponse()); 
 			return;
 		}
 		
 	}
 
-
+	// Static file handle
 	std::string server_root = server_config ? server_config->root : "pages/www";  
 	if (matching_location && !matching_location->root.empty())
 		server_root = matching_location->root;
 
-	// Per-location index for "/" paths
+	// Check if location has custom index → use it
+	// Otherwise → default to "index.html"
 	std::string filePath;                                                         
 	if (path == "/" || path.empty()) {
 		std::string indexName = (matching_location && !matching_location->index.empty())
 								? matching_location->index : "index.html";
 		filePath = server_root + "/" + indexName;
 	} else {
-		filePath = server_root + path;
+		filePath = server_root + path; // filePath = "./pages/www/about.html"
 	}
 
 	// Check if the method is allowed for this location
@@ -386,7 +386,11 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 		return;
 	}
 
-	// Handle POST requests (file upload)
+	/*
+	POST request → Check if location supports uploads
+	Has upload_path → Handle file upload
+	No upload_path → 400 Bad Request error
+	*/
 	if (request.getMethod() == "POST") {
 		if (matching_location && !matching_location->upload_path.empty()) {
 			handleFileUpload(request, matching_location->upload_path, socketFD, server_config, srv);
@@ -403,59 +407,37 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 		return;
 	}
 
-	// Directory request → list on GET, and support HEAD (no body)
-	if ((request.getMethod() == "GET" || request.getMethod() == "HEAD") && !filePath.empty() && filePath[filePath.length() - 1] == '/') {
+	// Auto index directory listing
+	// filePath ends with / (indicates directory)
+	if ((request.getMethod() == "GET" ) && !filePath.empty() && filePath[filePath.length() - 1] == '/') {
 		bool autoindex_enabled = (matching_location ? matching_location->autoindex : false);
 		if (autoindex_enabled) {
 			std::string dirListing = generateDirectoryListing(filePath);
-			if (request.getMethod() == "HEAD")
-			{
-				std::ostringstream h;
-				h << "Content-Type: text/html\r\n"
-				  << "Content-Length: " << dirListing.size() << "\r\n"
-				  << request.connectionHeader(request.isConnectionAlive())
-				  << "\r\n";
-				HTTPResponse response("OK", 200, h.str(), socketFD);
-				srv.queueResponse(socketFD, response.getRawResponse());
-				return;
-			}
 			std::string responseContent = "Content-Type: text/html\r\n"
 										+ request.connectionHeader(request.isConnectionAlive()) + "\r\n"
 										+ dirListing;
 			HTTPResponse response("OK", 200, responseContent, socketFD);
-			srv.queueResponse(socketFD, response.getRawResponse()); // [CHANGE]
+			srv.queueResponse(socketFD, response.getRawResponse()); 
 		}
 		else
-			sendError(403, "Forbidden", socketFD, server_config, &request, srv);     // [CHANGE]
+			sendError(403, "Forbidden", socketFD, server_config, &request, srv);     
 		return;
 	}
 
-	// Regular file
+	// Read file (serveFile()) → Get file content
 	std::string content = serveFile(filePath);
 	if (content.empty()) {
-		sendError(404, "Not Found", socketFD, server_config, &request, srv);         // [CHANGE]
+		sendError(404, "Not Found", socketFD, server_config, &request, srv);         
 		return;
 	}
 
-	// Static Files
+	// Determine static file type → Based on file extension
 	std::string contentType = "text/html";
 	if (filePath.find(".css") != std::string::npos) contentType = "text/css";
 	else if (filePath.find(".js")  != std::string::npos) contentType = "application/javascript";
 	else if (filePath.find(".jpg") != std::string::npos || filePath.find(".jpeg") != std::string::npos) contentType = "image/jpeg";
 	else if (filePath.find(".png") != std::string::npos) contentType = "image/png";
-
-	if (request.getMethod() == "HEAD")
-	{ 
-		// HEAD request - headers only, no body
-		std::ostringstream h;
-		h << "Content-Type: " << contentType << "\r\n"
-		  << "Content-Length: " << content.size() << "\r\n"
-		  << request.connectionHeader(request.isConnectionAlive())
-		  << "\r\n";
-		HTTPResponse response("OK", 200, h.str(), socketFD);
-		srv.queueResponse(socketFD, response.getRawResponse());
-		return;
-	}
+	// Create HTTP response → Headers + content
 	std::string responseContent = "Content-Type: " + contentType + "\r\n"
 								+ request.connectionHeader(request.isConnectionAlive()) + "\r\n"
 								+ content;

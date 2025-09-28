@@ -1,7 +1,6 @@
 #include "cgi.hpp"
 #include "cgi_helper.hpp"
-#include <cerrno>
-#include <signal.h>
+
 
 //constructor
 CGIHandler::CGIHandler() {}
@@ -13,13 +12,6 @@ bool CGIHandler::needsCGI(const std::string& filepath, const std::map<std::strin
     return CGIHelper::isCGIScript(filepath, cgi_extensions);
 }
 
-std::string CGIHandler::extractScriptName(const std::string& uri) {
-    size_t query_pos = uri.find('?');
-    if (query_pos != std::string::npos) {
-        return uri.substr(0, query_pos);
-    }
-    return uri;
-}
 
 std::string CGIHandler::extractQueryString(const std::string& path) {
     size_t question_pos = path.find('?');
