@@ -17,7 +17,7 @@
 
 struct CGIResult;
 
-// Global utility function
+
 std::string intToString(int value);
 
 // Helper functions 

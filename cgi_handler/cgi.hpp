@@ -1,17 +1,9 @@
 #ifndef CGI_HPP
 #define CGI_HPP
 
-#include <string>
-#include <map>
-#include <vector>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <sys/types.h>
-#include <cstdlib>
-#include <iostream>
-#include <sstream>
-#include <cctype>
-#include <cstring>
+
+#include <cerrno>
+#include <signal.h>
 #include "../http/HTTPRequest/HTTPRequest.hpp"
 #include "cgi_helper.hpp"
 
@@ -21,9 +13,9 @@ struct CGIResult {
     std::string headers;
     std::string body;
     std::string content; //add ( body + header)
-    std::string status_message; //add
+    std::string status_message; 
     int status_code;
-    int socketFD; //add
+    int socketFD; 
     bool success;
     
     CGIResult() : status_code(200), success(false) {}
@@ -45,7 +37,6 @@ public:
     
    
     bool needsCGI(const std::string& filepath, const std::map<std::string, std::string>& cgi_extensions);
-    std::string extractScriptName(const std::string& uri);
     std::string extractQueryString(const std::string& path);
     void clearEnvironment();
 };
