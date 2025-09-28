@@ -2,7 +2,7 @@
 # define SERVER_HPP
 
 #include <vector>
-#include <string.h>
+#include <string>
 #include "config_files/config.hpp"
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -17,7 +17,6 @@
 #include "http/HTTP.hpp"
 #include "http/HTTPRequest/HTTPRequest.hpp"
 
-
 class Server
 {
 	private:
@@ -29,19 +28,18 @@ class Server
 		std::map<int, time_t> last_activity; //track last activity per fd
 		int timeout;
 
-		// [ADD] Per-client write buffer + close-after-write flag
+		// Per-client write buffer + close-after-write flag
 		struct ClientState { std::string outbox; bool close_after_write; };
-		std::map<int, ClientState> client_state_; // by client fd  // [ADD]
+		std::map<int, ClientState> client_state_; // by client fd
 		
 		// helper
 		void addNewConnection(int listen_fd, std::map<int, HTTPRequest> &request_map);
-		// void readClientData(int i);
-		// void	readClientData(std::map<int, HTTPRequest>& requestMap, size_t &i);
 		void addPfds(int client_fd);
 		void removePfds(int i);
 		bool isListeningSocket(int fd);
-		void enableWrite(int fd);   // [ADD]
-		void disableWrite(int fd);  // [ADD]
+		void checkTimeOut(std::map<int, HTTPRequest> request_map);
+		void enableWrite(int fd);
+		void disableWrite(int fd);
 
 	public:
 		// default constructor
@@ -55,8 +53,8 @@ class Server
 		int createListeningSocket(const std::string& port_str);
 		void run();
 		bool start();
-		void queueResponse(int fd, const std::string& data); // [ADD]
-		void markCloseAfterWrite(int fd); // [ADD]
+		void queueResponse(int fd, const std::string& data);
+		void markCloseAfterWrite(int fd);
 		friend void readClientData(int socketFD, std::map<int, HTTPRequest>& requestMap, std::vector<struct pollfd>& fds, size_t &i, const std::vector<ServerConfig>& servers, Server& srv);
 
 };
