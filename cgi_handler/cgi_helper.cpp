@@ -84,7 +84,7 @@ void addEnvironmentVar(std::map<std::string, std::string>& env_vars, const std::
     env_vars[key] = value;
 }
 
-// File/Path processing helpers
+// Extract file extension from path
 std::string getFileExtension(const std::string& filepath) {
     size_t dot_pos = filepath.find_last_of('.');
     if (dot_pos != std::string::npos && dot_pos < filepath.length() - 1) {

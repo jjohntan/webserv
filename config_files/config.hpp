@@ -8,6 +8,8 @@
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
+#include <algorithm>
+#include <set>
 
 struct Location {
     std::string path;
@@ -54,7 +56,6 @@ private:
     
 public:
     std::vector<ServerConfig> parseConfig(const std::string& filename);
-    void printConfig(const std::vector<ServerConfig>& servers);
     bool validateConfig(const std::vector<ServerConfig>& servers);
 };
 

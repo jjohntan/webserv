@@ -22,7 +22,7 @@ int runWithConfig(const std::string& config_file) {
     }
     
     std::cout << "Successfully parsed " << servers.size() << " server(s)" << std::endl;
-    parser.printConfig(servers);
+    
     
     // Use the first server configuration for informational messages
     const ServerConfig& server_config = servers[0];
