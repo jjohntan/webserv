@@ -4,7 +4,7 @@
 #include "HTTPRequest/HTTPRequest.hpp"
 #include "../cgi_handler/cgi.hpp"
 #include "../config_files/config.hpp"
-#include "../Server.hpp" 
+#include "../server/Server.hpp" 
 #include "HTTPResponse/HTTPResponse.hpp"
 #include "HTTPResponse/ErrorResponse.hpp"
 #include "HTTP.hpp"
