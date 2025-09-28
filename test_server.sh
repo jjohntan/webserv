@@ -87,7 +87,7 @@ need_build() {
 # -----------------------------
 CFG_FILE="${CFG_FILE:-testconfig/test.conf}"
 LOG_FILE="${LOG_FILE:-server_test.log}"
-BIN_CANDIDATES=( "${BIN:-}" ./webserv ./webserver ./a.out )
+BIN_CANDIDATES=( "${BIN:-}" ./webserv ./webserv ./a.out )
 PORTS=(8080 8081 8082 8083)
 HOST="127.0.0.1"
 STARTUP_WAIT_SECS=6
@@ -125,7 +125,7 @@ if [[ -z "${BIN_PATH}" ]] && [[ -f Makefile ]]; then
     if [[ -x "$c" ]]; then BIN_PATH="$c"; break; fi
   done
 fi
-[[ -x "${BIN_PATH:-}" ]] || fatal "Could not find server binary (expected ./webserv, ./webserver, or ./a.out)."
+[[ -x "${BIN_PATH:-}" ]] || fatal "Could not find server binary (expected ./webserv, ./webserv, or ./a.out)."
 [[ -f "$CFG_FILE" ]] || fatal "Config file not found: ${CFG_FILE}"
 
 # -----------------------------
@@ -706,7 +706,7 @@ server {
 EOF
 
 # Try to start server with duplicate config
-timeout 5s ./webserver "$DUPLICATE_CONFIG" >/dev/null 2>&1 &
+timeout 5s ./webserv "$DUPLICATE_CONFIG" >/dev/null 2>&1 &
 DUPLICATE_PID=$!
 sleep 2
 if kill -0 "$DUPLICATE_PID" 2>/dev/null; then
@@ -736,7 +736,7 @@ server {
 EOF
 
 # Try to start server with different server names
-timeout 5s ./webserver "$DIFFERENT_CONFIG" >/dev/null 2>&1 &
+timeout 5s ./webserv "$DIFFERENT_CONFIG" >/dev/null 2>&1 &
 DIFFERENT_PID=$!
 sleep 2
 if kill -0 "$DIFFERENT_PID" 2>/dev/null; then
@@ -749,7 +749,7 @@ fi
 # 3) Test multiple terminal launch (same config)
 say "Testing multiple terminal launch with same config..."
 # Start a second instance in background
-timeout 10s ./webserver testconfig/test.conf >/dev/null 2>&1 &
+timeout 10s ./webserv testconfig/test.conf >/dev/null 2>&1 &
 SECOND_PID=$!
 sleep 3
 
@@ -796,7 +796,7 @@ server {
 EOF
 
 # Try to start second instance
-timeout 10s ./webserver "$MULTI_CONFIG" >/dev/null 2>&1 &
+timeout 10s ./webserv "$MULTI_CONFIG" >/dev/null 2>&1 &
 MULTI_PID=$!
 sleep 3
 
