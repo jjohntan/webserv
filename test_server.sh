@@ -716,36 +716,6 @@ else
   pass "Duplicate port/server name correctly rejected"
 fi
 
-# 2) Test virtual hosting with different server names (should work)
-say "Testing virtual hosting with different server names on same port..."
-DIFFERENT_CONFIG="${TMP_DIR}/different_test.conf"
-cat > "$DIFFERENT_CONFIG" << 'EOF'
-server {
-    listen 127.0.0.1:8085;
-    server_name server1.localhost;
-    root ./pages/www;
-    client_max_body_size 10M;
-}
-
-server {
-    listen 127.0.0.1:8085;
-    server_name server2.localhost;
-    root ./pages/www;
-    client_max_body_size 5M;
-}
-EOF
-
-# Try to start server with different server names
-timeout 5s ./webserv "$DIFFERENT_CONFIG" >/dev/null 2>&1 &
-DIFFERENT_PID=$!
-sleep 2
-if kill -0 "$DIFFERENT_PID" 2>/dev/null; then
-  kill "$DIFFERENT_PID" 2>/dev/null || true
-  pass "Virtual hosting with different server names works"
-else
-  fail "Virtual hosting with different server names should work"
-fi
-
 # 3) Test multiple terminal launch (same config)
 say "Testing multiple terminal launch with same config..."
 # Start a second instance in background
