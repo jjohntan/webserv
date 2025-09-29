@@ -416,13 +416,22 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 	if (matching_location && !matching_location->root.empty())
 		server_root = matching_location->root;
 
+	bool location_autoindex = matching_location && matching_location->autoindex;
+	std::string server_root_with_slash = server_root;
+	if (!server_root_with_slash.empty() && server_root_with_slash[server_root_with_slash.size() - 1] != '/')
+		server_root_with_slash += "/";
+
 	// Check if location has custom index → use it
 	// Otherwise → default to "index.html"
 	std::string filePath;                                                         
 	if (path == "/" || path.empty()) {
-		std::string indexName = (matching_location && !matching_location->index.empty())
+		if (location_autoindex) {
+			filePath = server_root_with_slash;
+		} else {
+			std::string indexName = (matching_location && !matching_location->index.empty())
 								? matching_location->index : "index.html";
-		filePath = server_root + "/" + indexName;
+			filePath = server_root_with_slash + indexName;
+		}
 	} else {
 		filePath = server_root + path; // filePath = "./pages/www/about.html"
 	}
@@ -457,7 +466,7 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 	// Auto index directory listing
 	// filePath ends with / (indicates directory)
 	if ((request.getMethod() == "GET" ) && !filePath.empty() && filePath[filePath.length() - 1] == '/') {
-		bool autoindex_enabled = (matching_location ? matching_location->autoindex : false);
+		bool autoindex_enabled = location_autoindex;
 		if (autoindex_enabled) {
 			std::string dirListing = generateDirectoryListing(filePath);
 			std::string responseContent = "Content-Type: text/html\r\n"
