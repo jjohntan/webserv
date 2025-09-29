@@ -227,26 +227,26 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
         
         std::cout << "[DEBUG] CGI starting to read output with timeout" << std::endl;
         
+        //loop
         while (timeout_count < max_timeout) {
             // Use select to check if data is available with timeout
-            fd_set readfds;
-            struct timeval timeout;
+            fd_set readfds;                    // File descriptor set for select()
+            struct timeval timeout;            // Timeout structure
             
-            FD_ZERO(&readfds);
-            FD_SET(output_pipe[0], &readfds);
-            timeout.tv_sec = 0;
-            timeout.tv_usec = 100000; // 100ms
+            FD_ZERO(&readfds);                // Clear the file descriptor set
+            FD_SET(output_pipe[0], &readfds); // Add output pipe read end to set
+            timeout.tv_sec = 0;               // No seconds timeout
+            timeout.tv_usec = 100000;         // 100ms timeout
             
             int select_result = select(output_pipe[0] + 1, &readfds, NULL, NULL, &timeout);
             
             if (select_result > 0 && FD_ISSET(output_pipe[0], &readfds)) {
-                // Data is available, read it
+                // >0 data is available to read; =0 timeout; <0 error
                 bytes_read = read(output_pipe[0], buffer, sizeof(buffer));
                 if (bytes_read > 0) {
                     output.append(buffer, bytes_read);
-                    // Don't reset timeout counter - we want total elapsed time
                 } else if (bytes_read == 0) {
-                    // EOF reached
+                    // EOF reached, child close pipe and end loop
                     break;
                 }
             } else if (select_result == 0) {
@@ -265,13 +265,12 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
         
         close(output_pipe[0]);
         
+        //error handling when cgi timeout >10
         if (timeout_count >= max_timeout) {
             std::cout << "[DEBUG] CGI pipe read timeout after 10 seconds" << std::endl;
-            // Kill the child process since we timed out reading from it
             kill(pid, SIGKILL);
-            // Wait for the process to actually die
             int kill_status;
-            waitpid(pid, &kill_status, 0);
+            waitpid(pid, &kill_status, 0); // waits for the child process to actually terminate
             
             result.success = false;
             result.status_code = 504; // Gateway Timeout
@@ -285,7 +284,7 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
 
         std::cout << "output =" << output << std::endl;
         
-        // Wait for child process to complete with timeout
+        // Wait for CGI script process to actually exit, avoid hangs
         int status = 0;
         if (!CGIHelper::waitForChildWithTimeout(pid, 10, status)) { // 10 second timeout to match test expectations
             result.success = false;
