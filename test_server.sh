@@ -951,7 +951,7 @@ fi
 if have_cmd siege; then
   # Test 1: Basic stress test on index page (availability > 99.5%)
   say "Running basic stress test on index page..."
-  SIEGE_C="${SIEGE_C:-25}"
+  SIEGE_C="${SIEGE_C:-50}"
   SIEGE_T="${SIEGE_T:-30S}"
   say "Command: siege -b -c ${SIEGE_C} -t ${SIEGE_T} http://${HOST}:8080/"
   
