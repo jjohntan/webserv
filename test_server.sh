@@ -716,8 +716,8 @@ else
   pass "Duplicate port/server name correctly rejected"
 fi
 
-# 2) Test duplicate port with different server names (should work)
-say "Testing duplicate port 8085 with different server names..."
+# 2) Test virtual hosting with different server names (should work)
+say "Testing virtual hosting with different server names on same port..."
 DIFFERENT_CONFIG="${TMP_DIR}/different_test.conf"
 cat > "$DIFFERENT_CONFIG" << 'EOF'
 server {
@@ -741,9 +741,9 @@ DIFFERENT_PID=$!
 sleep 2
 if kill -0 "$DIFFERENT_PID" 2>/dev/null; then
   kill "$DIFFERENT_PID" 2>/dev/null || true
-  pass "Duplicate port with different server names works"
+  pass "Virtual hosting with different server names works"
 else
-  fail "Duplicate port with different server names should work"
+  fail "Virtual hosting with different server names should work"
 fi
 
 # 3) Test multiple terminal launch (same config)
