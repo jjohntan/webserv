@@ -28,24 +28,5 @@ This project implements a complete HTTP server that:
 make
 ```
 
-## CGI Scripts
 
-Place Python CGI scripts in `cgi_bin/` directory.
 
-Example CGI script:
-```python
-#!/usr/bin/env python3
-import os
-print("Content-Type: text/html\r\n\r\n")
-print("<html><body><h1>Hello World!</h1></body></html>")
-```
-
-## Configuration
-
-Edit `testconfig/test.conf` to configure server settings.
-
-## Testing
-
-```bash
-./test_server.sh
-```
