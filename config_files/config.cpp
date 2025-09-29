@@ -95,7 +95,9 @@ bool ConfigParser::validateConfig(const std::vector<ServerConfig>& servers) {
         return false;
     }
     
-    checkDuplicatePorts(servers);
+    if (!checkDuplicatePorts(servers)) {
+        return false;
+    }
     return true;
 }
 
@@ -309,15 +311,24 @@ bool ConfigParser::validateLocationConfig(const Location& location) {
     return true;
 }
 
-void ConfigParser::checkDuplicatePorts(const std::vector<ServerConfig>& servers) {
+bool ConfigParser::checkDuplicatePorts(const std::vector<ServerConfig>& servers) {
     std::set<std::pair<std::string, int> > used_addresses;
+    bool has_duplicates = false;
     
     for (size_t i = 0; i < servers.size(); ++i) {
         std::pair<std::string, int> addr(servers[i].listen_ip, servers[i].port);
         if (used_addresses.find(addr) != used_addresses.end()) {
-            std::cout << "Warning: Duplicate listen address " 
+            std::cout << "Error: Duplicate listen address " 
                       << servers[i].listen_ip << ":" << servers[i].port << std::endl;
+            has_duplicates = true;
         }
         used_addresses.insert(addr);
     }
+    
+    if (has_duplicates) {
+        std::cout << "Error: Configuration contains duplicate listen addresses. Server cannot start." << std::endl;
+        return false;
+    }
+    
+    return true;
 }

@@ -52,7 +52,7 @@ private:
     bool validateErrorCode(int code);
     bool validateServerConfig(const ServerConfig& server);
     bool validateLocationConfig(const Location& location);
-    void checkDuplicatePorts(const std::vector<ServerConfig>& servers);
+    bool checkDuplicatePorts(const std::vector<ServerConfig>& servers);
     
 public:
     std::vector<ServerConfig> parseConfig(const std::string& filename);

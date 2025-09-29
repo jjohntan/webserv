@@ -137,7 +137,7 @@ const ServerConfig* findServerConfig(const HTTPRequest& request, const std::vect
 		port = 80;
 	}
 	
-	// First pass: Find exact match by server_name and port
+	// First pass: Exact Match (Hostname + Port)
 	for (size_t i = 0; i < servers.size(); ++i) {
 		if (servers[i].port == port) {
 			// Check if this server has the requested hostname
@@ -149,7 +149,8 @@ const ServerConfig* findServerConfig(const HTTPRequest& request, const std::vect
 		}
 	}
 	
-	// Second pass: Find first server on the same port (default server for this port)
+	// Second pass: port match only. If no exact hostname match, find first server on the same port
+	//Acts as default server for that port
 	for (size_t i = 0; i < servers.size(); ++i) {
 		if (servers[i].port == port) {
 			return &servers[i];
@@ -382,9 +383,12 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 			std::cout << "Executing CGI Script: " << script_path << std::endl;
 			
 			// Extract server name from Host header
-			std::string server_name = "localhost";
-			const std::map<std::string, std::string>& headers = request.getHeaderMap();
-			std::map<std::string, std::string>::const_iterator host_it = headers.find("host");
+			std::string server_name = "localhost"; // default
+			const std::map<std::string, std::string>& headers = request.getHeaderMap(); //Gets all HTTP headers from the request
+			std::map<std::string, std::string>::const_iterator host_it = headers.find("host"); // Searches for the "host" header
+			
+			//If Host header is found, process it
+			//If not found, keep default "localhost"
 			if (host_it != headers.end()) {
 				std::string host = host_it->second;
 				size_t colon_pos = host.find(':');
