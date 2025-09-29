@@ -29,7 +29,9 @@ void CGIHandler::clearEnvironment() {
 CGIResult CGIHandler::executeCGI(const HTTPRequest& request, 
                                 const std::string& script_path,
                                 const std::map<std::string, std::string>& cgi_extensions,
-                                const std::string& working_directory) {
+                                const std::string& working_directory,
+                                const std::string& server_name,
+                                int server_port) {
     CGIResult result;
     
     // Set the socket FD from the request
@@ -112,7 +114,7 @@ CGIResult CGIHandler::executeCGI(const HTTPRequest& request,
     CONTENT_LENGTH=...
     SCRIPT_FILENAME=/path/to/hello.py
     */
-    CGIHelper::setupEnvironment(env_vars, request, normalized_script_path, query_string);
+    CGIHelper::setupEnvironment(env_vars, request, normalized_script_path, query_string, server_name, server_port);
     
     /*
     input_pipe → parent writes POST body, child reads it as stdin.

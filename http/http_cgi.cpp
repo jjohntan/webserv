@@ -55,10 +55,10 @@ static void sendError(int code, const std::string& message, int socketFD, const 
 /* --------------------------------------------------------------------------------------------------------------------------------*/
 
 // CGI call function
-CGIResult runCGI(const HTTPRequest& request, const std::string& script_path, const std::map<std::string, std::string>& cgi_extensions, const std::string& working_directory)
+CGIResult runCGI(const HTTPRequest& request, const std::string& script_path, const std::map<std::string, std::string>& cgi_extensions, const std::string& working_directory, const std::string& server_name, int server_port)
 {
 	CGIHandler cgi_handler;
-	return cgi_handler.executeCGI(request, script_path, cgi_extensions, working_directory);
+	return cgi_handler.executeCGI(request, script_path, cgi_extensions, working_directory, server_name, server_port);
 }
 
 // read static files structure
@@ -112,16 +112,44 @@ std::string generateDirectoryListing(const std::string& dirPath)
 
 
 const ServerConfig* findServerConfig(const HTTPRequest& request, const std::vector<ServerConfig>& servers) {
-	
-    // Inside findServerConfig() function:
 	const std::map<std::string, std::string>& headers = request.getHeaderMap();
-	std::string host = headers.find("host")->second;  // "localhost:8081"
-	size_t colon_pos = host.find(':');               // Find ":"
-	std::string port_str = host.substr(colon_pos + 1); // Extract "8081"
-	int port = atoi(port_str.c_str());               // Convert to 8081 (int)
-	// Loop through servers and match by port
+	std::map<std::string, std::string>::const_iterator host_it = headers.find("host");
 	
-	// Find matching server configuration
+	if (host_it == headers.end()) {
+		// No Host header, return first server as fallback
+		return servers.empty() ? NULL : &servers[0];
+	}
+	
+	std::string host = host_it->second;  // "localhost:8081" or "example.com:8080"
+	std::string hostname;
+	std::string port_str;
+	int port;
+	
+	// Parse hostname and port from Host header
+	size_t colon_pos = host.find(':');
+	if (colon_pos != std::string::npos) {
+		hostname = host.substr(0, colon_pos);
+		port_str = host.substr(colon_pos + 1);
+		port = atoi(port_str.c_str());
+	} else {
+		// No port specified, assume default port 80
+		hostname = host;
+		port = 80;
+	}
+	
+	// First pass: Find exact match by server_name and port
+	for (size_t i = 0; i < servers.size(); ++i) {
+		if (servers[i].port == port) {
+			// Check if this server has the requested hostname
+			for (size_t j = 0; j < servers[i].server_names.size(); ++j) {
+				if (servers[i].server_names[j] == hostname) {
+					return &servers[i];
+				}
+			}
+		}
+	}
+	
+	// Second pass: Find first server on the same port (default server for this port)
 	for (size_t i = 0; i < servers.size(); ++i) {
 		if (servers[i].port == port) {
 			return &servers[i];
@@ -352,7 +380,22 @@ void handleRequestProcessing(const HTTPRequest& request, int socketFD, const std
 
 			// Execute CGI
 			std::cout << "Executing CGI Script: " << script_path << std::endl;
-			CGIResult cgi_result = runCGI(request, script_path, cgi_extensions, working_directory);
+			
+			// Extract server name from Host header
+			std::string server_name = "localhost";
+			const std::map<std::string, std::string>& headers = request.getHeaderMap();
+			std::map<std::string, std::string>::const_iterator host_it = headers.find("host");
+			if (host_it != headers.end()) {
+				std::string host = host_it->second;
+				size_t colon_pos = host.find(':');
+				if (colon_pos != std::string::npos) {
+					server_name = host.substr(0, colon_pos);
+				} else {
+					server_name = host;
+				}
+			}
+			
+			CGIResult cgi_result = runCGI(request, script_path, cgi_extensions, working_directory, server_name, server_config->port);
 			std::string cgiPayload = cgi_result.content;
 			stripCgiStatusHeader(cgiPayload);
 			HTTPResponse response(cgi_result.status_message, cgi_result.status_code, cgiPayload, socketFD);

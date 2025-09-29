@@ -23,8 +23,8 @@ std::string intToString(int value);
 // Helper functions 
 namespace CGIHelper {
   
-    void setupEnvironment(std::map<std::string, std::string>& env_vars, const HTTPRequest& request, const std::string& script_path, const std::string& query_string);
-    void setupStandardCGIVars(std::map<std::string, std::string>& env_vars, const HTTPRequest& request, const std::string& script_path, const std::string& query_string);
+    void setupEnvironment(std::map<std::string, std::string>& env_vars, const HTTPRequest& request, const std::string& script_path, const std::string& query_string, const std::string& server_name, int server_port);
+    void setupStandardCGIVars(std::map<std::string, std::string>& env_vars, const HTTPRequest& request, const std::string& script_path, const std::string& query_string, const std::string& server_name, int server_port);
     void setupHTTPHeaders(std::map<std::string, std::string>& env_vars, const HTTPRequest& request);
     void addEnvironmentVar(std::map<std::string, std::string>& env_vars, const std::string& key, const std::string& value);
     

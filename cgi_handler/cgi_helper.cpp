@@ -13,13 +13,13 @@ std::string intToString(int value) {
 namespace CGIHelper {
 
 // Environment setup helpers
-void setupEnvironment(std::map<std::string, std::string>& env_vars, const HTTPRequest& request, const std::string& script_path, const std::string& query_string) {
+void setupEnvironment(std::map<std::string, std::string>& env_vars, const HTTPRequest& request, const std::string& script_path, const std::string& query_string, const std::string& server_name, int server_port) {
     env_vars.clear();
-    setupStandardCGIVars(env_vars, request, script_path, query_string);
+    setupStandardCGIVars(env_vars, request, script_path, query_string, server_name, server_port);
     setupHTTPHeaders(env_vars, request);
 }
 
-void setupStandardCGIVars(std::map<std::string, std::string>& env_vars, const HTTPRequest& request, const std::string& script_path, const std::string& query_string) {
+void setupStandardCGIVars(std::map<std::string, std::string>& env_vars, const HTTPRequest& request, const std::string& script_path, const std::string& query_string, const std::string& server_name, int server_port) {
     //  HTTPRequest getters (from nelson)
     addEnvironmentVar(env_vars, "REQUEST_METHOD", request.getMethod());
     addEnvironmentVar(env_vars, "SCRIPT_NAME", script_path);
@@ -29,9 +29,9 @@ void setupStandardCGIVars(std::map<std::string, std::string>& env_vars, const HT
     addEnvironmentVar(env_vars, "GATEWAY_INTERFACE", "CGI/1.1");
     addEnvironmentVar(env_vars, "SERVER_SOFTWARE", "webserv/1.0");
     
-    // Server information 
-    addEnvironmentVar(env_vars, "SERVER_NAME", "localhost");
-    addEnvironmentVar(env_vars, "SERVER_PORT", "8080");
+    // Server information - use actual server name and port
+    addEnvironmentVar(env_vars, "SERVER_NAME", server_name);
+    addEnvironmentVar(env_vars, "SERVER_PORT", intToString(server_port));
     addEnvironmentVar(env_vars, "REMOTE_ADDR", "127.0.0.1");
     
     // Content length and type

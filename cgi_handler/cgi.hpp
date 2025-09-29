@@ -33,7 +33,9 @@ public:
     CGIResult executeCGI(const HTTPRequest& request, 
                         const std::string& script_path,
                         const std::map<std::string, std::string>& cgi_extensions,
-                        const std::string& working_directory);
+                        const std::string& working_directory,
+                        const std::string& server_name,
+                        int server_port);
     
    
     bool needsCGI(const std::string& filepath, const std::map<std::string, std::string>& cgi_extensions);
