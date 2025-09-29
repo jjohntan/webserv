@@ -7,7 +7,7 @@ ServerConfig::ServerConfig() : port(0), client_max_body_size(0) {
 
 // ==================== MAIN CONFIGURATION FUNCTIONS ====================
 
-std::vector<ServerConfig> ConfigParser::parseConfig(const std::string& filename) {
+std::vector<ServerConfig> ConfigParser::    parseConfig(const std::string& filename) {
     std::ifstream file(filename.c_str());
     if (!file.is_open()) {
         std::cout << "Error: Cannot open config file: " << filename << std::endl;
